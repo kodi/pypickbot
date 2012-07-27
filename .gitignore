@@ -1,0 +1,4 @@
+./config.cfg
+./config
+./pypickupbot/modules/dropin.cache
+_build

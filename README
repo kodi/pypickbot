@@ -1,0 +1,38 @@
+pypickupbot - A simple IRC pickup bot written in Python
+=======================================================
+
+A script that encourages people to gather on IRC with the purpose of playing a
+game with captain-picked teams on predetermined game modes.
+
+
+Dependencies
+------------
+
+pypickupbot is written in Python, so doesn't need compiling. You will however
+need the following dependencies at runtime:
+
+  * Python 2.6 or higher Python 2
+  * Twisted, the more recent the better
+
+
+Setting up
+----------
+
+All you need to know and do is in the quick setup guide in the quick setup
+guide(INSTALL.html). If for some reason you can't open html files, consult the
+following files:
+
+doc/quick/config.rst
+doc/quick/usage.rst
+
+
+Contact
+-------
+
+Launchpad Answers:
+    https://answers.launchpad.net/pypickupbot
+
+IRC:
+    epsy in #armagetron / #armagetron.pickup on irc.FreeNode.net
+
+
