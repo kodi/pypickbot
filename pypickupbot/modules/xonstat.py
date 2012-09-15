@@ -71,27 +71,21 @@ class XonstatInterface:
             json_data = json.loads(response.read())
         except:
             json_data = {}
-        print response.status, json_data
         return json_data
 
     def _get_player_info(self, playerid):
         player_info = self._get_xonstat_json("/player/{0}.json".format(playerid))
-        print player_info
+        #print player_info
         return player_info
-
-    def _get_game_info(self, gameid):
-        game_info = self._get_xonstat_json("/game/{0}.json".format(gameid))
-        return game_info
 
     def _purge(self, keep=0):
         """used by clearPlayers and purgePlayers"""
-        res = defer.gatherResults([
+        res = defer.gatherResults(
             db.runOperation("""
-                DELETE FROM """ + table + """
-                WHERE time < ?
+                DELETE FROM xonstat_players
+                WHERE time > ?
                 """, (itime() - keep,))
-            for table in ['xonstat_players']
-            ])
+            )
         def onErr(failure):
             log.err(failure, "purge players, keep = {0}".format(keep))
             return failure
@@ -125,6 +119,9 @@ class XonstatInterface:
                 raise InputError(e)
         else:
             raise InputError("You need to specify a time range")
+        d = call.confirm(
+            "This will delete the record of all players registered later than {0}, continue?".format(str_from_timediff(keep))
+            )
         def _confirmed(ret):
             if ret:
                 def done(*args):
@@ -167,34 +164,81 @@ class XonstatInterface:
                 game_nick       = player_info['player']['stripped_nick']
                 profile_link    = self._get_xonstat_url(playerid)
                 
-                call.reply(_("{0} is player {1} : {2}").format(nick, game_nick, profile_link))
+                elo_list = []
+                for gametype,elo in player_info['elos'].items():
+                    elo_list.append( _("{0}: {1}").format(gametype.upper(), round(elo,1)) )
+                elo_list.sort()
+                elo_display = " | ".join(elo_list)
+                if len(elo_list) == 0:
+                    elo_display = _("none yet")
+                
+                rank_list = []
+                for gametype,rank in player_info['ranks'].items():
+                    rank_list.append( _("{0}: {1} of {2}").format(gametype.upper(), rank[0], rank[1]) )
+                rank_list.sort()
+                rank_display = " | ".join(rank_list)
+                if len(rank_list) == 0:
+                    rank_display = _("none yet")
+                
+                if len(elo_list) == 0:
+                    reply = config.get("Xonstat Interface", "playerinfo_noelo").decode('string-escape')%\
+                        { 'nick': nick, 'gamenick': game_nick, 'profile': profile_link, }
+                elif len(rank_list) == 0:
+                    reply = config.get("Xonstat Interface", "playerinfo_norank").decode('string-escape')%\
+                        { 'nick': nick, 'gamenick': game_nick, 'elos': elo_display, 'profile': profile_link, }
+                else:
+                    reply = config.get("Xonstat Interface", "playerinfo").decode('string-escape')%\
+                        { 'nick': nick, 'gamenick': game_nick, 'elos': elo_display, 'ranks': rank_display, 'profile': profile_link, }
+                call.reply(reply)
             d.addCallback(_printResult)
 
     def register(self, call, args):
-        if len(args) == 2:
-            nick = args[0]
+        nick = call.nick
+        # TODO - check if already registered
+        if len(args) == 1:
             try:
-                playerid = int(args[1])
+                playerid = int(args[0])
             except ValueError:
                 raise InputError("Player id must be an integer")
             d = db.runOperation("""
                 INSERT INTO
                     xonstat_players(nick, playerid, create_dt, edit_dt)
-                VALUES (:nick, :playerid, :time, :time)
-                """, (nick, playerid, itime()))
+                VALUES (:nick, :playerid, :ctime, :mtime)
+                """, (nick, playerid, itime(), itime() ))
+            player_info     = self._get_player_info(playerid)
+            game_nick       = player_info['player']['stripped_nick']
+            profile_link    = self._get_xonstat_url(playerid)
+            msg = config.get('Xonstat Interface', 'registered').decode('string-escape')%\
+                { 'nick': nick, 'playerid': playerid, 'gamenick': game_nick, 'profile': profile_link, }
+            self.pickup.pypickupbot.msg( self.pickup.pypickupbot.channel, msg.encode('ascii') )
+
+    def removeplayer(self, call, args):
+        if len(args) == 1:
+            nick = args[0]
+            d = db.runOperation("""
+                DELTE FROM xonstat_players
+                WHERE nick=?
+                """, (nick,))
+        else:
+           raise InputError("You need to specify one player name")
 
     def pickup_game_started(self, game, players, captains):
         return
 
+    def user_renamed(self, oldname, newname):
+        return
+
     commands = {
-        'register':         (register, 0),
+        'register':         (register, COMMAND.NOT_FROM_PM),
         'playerinfo':       (playerinfo, 0),
         'listplayers':      (listplayers, 0),
+        'removeplayer':     (removeplayer, COMMAND.ADMIN),
         'clearplayers':     (clearPlayers, COMMAND.ADMIN),
         'purgeplayers':     (purgePlayers, COMMAND.ADMIN),
         }
     eventhandlers = {
-        'pickup_game_starting': pickup_game_started,
+        'pickup_game_starting':     pickup_game_started,
+        'userRenamed':              user_renamed,
         }
 
 xonstat_interface = SimpleModuleFactory(XonstatInterface)
