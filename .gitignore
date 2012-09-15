@@ -1,4 +1,11 @@
-./config.cfg
-./config
-./pypickupbot/modules/dropin.cache
+*~
+*.tmp
+*.bak
+*.old
+*.pyc
+/config.cfg
+/config
+/init.cfg
+/db.sqlite
+/pypickupbot/modules/dropin.cache
 _build
