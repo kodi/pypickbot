@@ -23,6 +23,7 @@
 from time import time
 from datetime import datetime
 import json
+import httplib
 
 from twisted.internet import defer
 from twisted.python import log
@@ -53,12 +54,34 @@ class XonstatInterface:
     def _get_xonstat_url(self, playerid):
         """return xontat url for specific player"""
         server = config.get("Xonstat Interface", "server").decode('string-escape')
-        port   = config.get("Xonstat Interface", "port").decode('string-escape')
-        url = "http://" + server
-        if port:
-            url += ":" + port
-        url += "/player/" + str(playerid)
+        url = "http://" + server + "/player/" + str(playerid)
         return url
+
+    def _get_xonstat_json(self, request):
+        server = config.get("Xonstat Interface", "server").decode('string-escape')
+        try:
+            http = httplib.HTTPConnection(server)
+            http.connect()
+            http.request("GET", request)
+            response = http.getresponse()
+            http.close()
+        except:
+            return None
+        try:
+            json_data = json.loads(response.read())
+        except:
+            json_data = {}
+        print response.status, json_data
+        return json_data
+
+    def _get_player_info(self, playerid):
+        player_info = self._get_xonstat_json("/player/{0}.json".format(playerid))
+        print player_info
+        return player_info
+
+    def _get_game_info(self, gameid):
+        game_info = self._get_xonstat_json("/game/{0}.json".format(gameid))
+        return game_info
 
     def _purge(self, keep=0):
         """used by clearPlayers and purgePlayers"""
@@ -139,7 +162,12 @@ class XonstatInterface:
                 if len(r) < 1:
                     call.reply(_("No player found")	)
                 nick, playerid, edit_dt = r[0]
-                call.reply(_("Player {0} has Xonstat id {1}: {2}").format(nick, playerid, self._get_xonstat_url(playerid)))
+                
+                player_info     = self._get_player_info(playerid)
+                game_nick       = player_info['player']['stripped_nick']
+                profile_link    = self._get_xonstat_url(playerid)
+                
+                call.reply(_("{0} is player {1} : {2}").format(nick, game_nick, profile_link))
             d.addCallback(_printResult)
 
     def register(self, call, args):
