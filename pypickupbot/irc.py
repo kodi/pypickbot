@@ -209,7 +209,7 @@ class IrcBot(irc.IRCClient, Modable):
         self.signedOn()
 
     def cmsg(self, message):
-        """shorthand for sneding channel messages"""
+        """shorthand for sending channel messages"""
         return self.msg(self.channel, message)
 
     def fetch_list(self, cmd, *args, **kwargs):
