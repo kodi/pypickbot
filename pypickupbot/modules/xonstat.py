@@ -35,6 +35,131 @@ from pypickupbot.irc import COMMAND, InputError
 from pypickupbot.misc import str_from_timediff, timediff_from_str,\
     InvalidTimeDiffString, StringTypes, itime
 
+class Player:
+
+    def __init__(self, nick, playerid = None, create_dt = None):
+        self.nick           = nick
+        self.playerid       = playerid
+        self.create_dt      = create_dt
+        self.player_info    = None
+
+    def __str__(self):
+        return "{0} (#{1})".format(self.nick, self.playerid)
+
+    def get_xonstat_url(self):
+        """return xontat url for specific player"""
+        return config.get("Xonstat Interface", "url").decode('string-escape') + "player/" + str(self.playerid)
+
+    def get_id(self):
+        return self.playerid
+
+    def _get_xonstat_json(self, request):
+        server = config.get("Xonstat Interface", "server").decode('string-escape')
+        try:
+            http = httplib.HTTPConnection(server)
+            http.connect()
+            http.request("GET", request)
+            response = http.getresponse()
+            http.close()
+        except:
+            return None
+        try:
+            json_data = json.loads(response.read())
+        except:
+            json_data = {}
+        return json_data
+
+    def _get_player_info(self):
+        if not self.player_info:
+            self.player_info = self._get_xonstat_json("/player/{0}.json".format(self.playerid))
+        return self.player_info
+
+    def get_nick(self):
+        try:
+            return self._get_player_info()['player']['stripped_nick']
+        except:
+            return "(unknown)"
+
+    def get_elo_dict(self):
+        return self._get_player_info()['elos']
+
+    def get_rank_dict(self):
+        return self._get_player_info()['ranks']
+
+    def get_elo(self, gametype):
+        gt = gametype.lower()
+        try:
+            elos = self._get_player_info()['elos']
+            if elos.has_key(gt):
+                return elos[gt]
+        except:
+            pass
+        return 0
+
+    def get_rank(self, gametype):
+        gt = gametype.lower()
+        try:
+            ranks = self._get_player_info()['ranks']
+            if ranks.has_key(gt):
+                return ranks[gt]
+        except:
+            pass
+        return (None, None)
+
+
+class Team:
+
+    def __init__(self, name, gametype):
+        self.players    = []
+        self.name       = name
+        self.gametype   = gametype
+        self.elo        = 0
+
+    def __str__(self):
+        return config.get('Xonstat Interface', 'team').decode('string-escape')%\
+                { 'name': self.name, 'players': ", ".join([ str(p) for p in self.players]),
+                    'mean_elo': str(round(self.get_mean_elo(),0)) }
+
+    def get_players(self):
+        return self.players
+
+    def add_player(self, player):
+        self.players.append(player)
+        elo = player.get_elo(self.gametype)
+        if elo:
+            self.elo += elo
+
+    def remove_player(self, player):
+        for p in self.players:
+            if p == player:
+                elo = player.get_elo()
+                if elo:
+                    self.elo -= elo
+                self.players.remove(p)
+                return True
+        return False
+
+    def get_mean_elo(self):
+        try:
+            return float(self.elo) / len(self.players)
+        except:
+            pass
+        return 0
+
+    def auto_add_player(self, other, pickpool):
+        elo_diff = self.get_mean_elo() - other.get_mean_elo()
+        elo = None
+        player = None
+        for p in pickpool:
+            p_elo = p.get_elo(self.gametype)
+            if not elo or (elo_diff > 0 and p_elo < elo) or (elo_diff < 0 and p_elo > 0):
+                elo = p_elo
+                player = p
+                print "adding {0} ({1} elo)".format(p.nick, p_elo)
+        self.add_player(player)
+        pickpool.remove(player)
+
+
 class XonstatInterface:
 
     def __init__(self, bot):
@@ -65,34 +190,8 @@ class XonstatInterface:
         def _loadPlayers(r):
             for entry in r:
                 nick, playerid, create_dt = entry
-                self.players[nick] = playerid
-            print self.players
+                self.players[nick] = Player(nick, playerid, create_dt)
         d.addCallback(_loadPlayers)
-
-    def _get_xonstat_url(self, playerid):
-        """return xontat url for specific player"""
-        url = config.get("Xonstat Interface", "url").decode('string-escape')
-        url = url + "player/" + str(playerid)
-        return url
-
-    def _get_xonstat_json(self, request):
-        server = config.get("Xonstat Interface", "server").decode('string-escape')
-        try:
-            http = httplib.HTTPConnection(server)
-            http.connect()
-            http.request("GET", request)
-            response = http.getresponse()
-            http.close()
-        except:
-            return None
-        try:
-            json_data = json.loads(response.read())
-        except:
-            json_data = {}
-        return json_data
-
-    def _get_player_info(self, playerid):
-        return self._get_xonstat_json("/player/{0}.json".format(playerid))
 
     def _purge(self, keep=0):
         """used by clearPlayers and purgePlayers"""
@@ -164,19 +263,15 @@ class XonstatInterface:
             raise InputError("You need to specify a player nickname.")
         
         nick = self._get_original_nick(args[0])
-        playerid = self._find_player(nick)
-        if not playerid:
+        player = self._find_player(nick)
+        if not player:
             call.reply(_("No player named <{0}> found!").format(nick))
             return
-            
-        player_info     = self._get_player_info(playerid)
-        game_nick       = player_info['player']['stripped_nick']
-        profile_link    = self._get_xonstat_url(playerid)
-            
+        
         sep = config.get("Xonstat Interface", "playerinfo_separator").decode('string-escape')
             
         elo_list = []
-        for gametype,elo in player_info['elos'].items():
+        for gametype,elo in player.get_elo_dict().items():
             elo_list.append( _("{0}: {1}").format(gametype.upper(), round(elo,1)) )
         elo_list.sort()
         elo_display = sep.join(elo_list)
@@ -184,7 +279,7 @@ class XonstatInterface:
             elo_display = _("none yet")
         
         rank_list = []
-        for gametype,rank in player_info['ranks'].items():
+        for gametype,rank in player.get_rank_dict().items():
             rank_list.append( _("{0}: {1} of {2}").format(gametype.upper(), rank[0], rank[1]) )
         rank_list.sort()
         rank_display = sep.join(rank_list)
@@ -192,7 +287,7 @@ class XonstatInterface:
             rank_display = _("none yet")
         
         reply = config.get("Xonstat Interface", "playerinfo").decode('string-escape')%\
-                { 'nick': nick, 'gamenick': game_nick, }
+                { 'nick': nick, 'gamenick': player.get_nick(), }
         if len(elo_list) > 0:
             reply += config.get("Xonstat Interface", "playerinfo_elo").decode('string-escape')%\
                 { 'elos': elo_display }
@@ -200,14 +295,16 @@ class XonstatInterface:
             reply += config.get("Xonstat Interface", "playerinfo_rank").decode('string-escape')%\
                 { 'ranks': rank_display, }
         reply += config.get("Xonstat Interface", "playerinfo_profile").decode('string-escape')%\
-            { 'profile': profile_link, }
+            { 'profile': player.get_xonstat_url(), }
         call.reply(reply)
 
     def player_exists(self, call, args):
         nick = self._get_original_nick(args[0])
-        playerid = self._find_player(nick)
-        if playerid:
-            reply = _("This nick is registered with player id #{0} (as \x02{1}\x02). Use \x02!playerinfo <nick>\x02 to see more details.").format(playerid, nick)
+        player = self._find_player(nick)
+        if player:
+            reply = _("This nick is registered with player id #{0} (as \x02{1}\x02). " + \
+                    "Use \x02!playerinfo <nick>\x02 to see more details.").\
+                    format(player.get_id(), nick)
         else:
             reply = _("No player information found for <{0}>.".format(nick))
         call.reply(reply)
@@ -217,28 +314,31 @@ class XonstatInterface:
             raise InputError(_("You must specify your Xonstat profile id to register an account."))
         
         nick = self._get_original_nick(call.nick)
-        playerid = self._find_player(nick)
-        if playerid:
-            raise InputError(_("This nick is already registered with player id #{0} (as <{1}>) - can't continue! If you need to change your player id, please contact one of the channel operators.").format(playerid, nick))
+        player = self._find_player(nick)
+        if player:
+            raise InputError(_("This nick is already registered with player id #{0} (as <{1}>) - can't continue! " + \
+                    "If you need to change your player id, please contact one of the channel operators.").\
+                    format(player.get_id(), nick))
         try:
             playerid = int(args[0])
         except ValueError:
             raise InputError(_("Player id must be an integer."))
         
-        player_info     = self._get_player_info(playerid)
-        profile_link    = self._get_xonstat_url(playerid)
-        game_nick       = player_info['player']['stripped_nick']
-        if not player_info:
+        player = Player(nick, playerid)
+        if not player._get_nick():
             raise InputError(_("This doesn't seem to be a valid Xonstat playerid!"))
         
-        d = call.confirm(_("You're about to register yourself with player id #{0} (\x02{1}\x02, Xonstat profile {1}), is this correct?").format(playerid, game_nick, profile_link))
+        d = call.confirm(_("You're about to register yourself with player id #{0} (\x02{1}\x02, " + \
+                "Xonstat profile {1}), is this correct?").\
+                format(player.get_id(), player.get_nick(), player.get_xonstat_url()))
         def _confirmed(ret):
             if ret:
                 def done(*args):
                     self._load_from_db()
+                    player = self._find_player(nick)
                     call.reply("Done.")
                     msg = config.get('Xonstat Interface', 'registered').decode('string-escape')%\
-                        { 'nick': nick, 'playerid': playerid, 'gamenick': game_nick, 'profile': profile_link, }
+                        { 'nick': nick, 'playerid': player.get_id(), 'gamenick': player.get_nick(), 'profile': player.get_xonstat_url(), }
                     self.pickup.pypickupbot.msg( self.pickup.pypickupbot.channel, msg.encode('ascii') )
                 d = db.runOperation("""
                     INSERT INTO xonstat_players(nick, playerid, create_dt)
@@ -269,6 +369,30 @@ class XonstatInterface:
         return d.addCallback(_confirmed)
 
     def pickup_game_started(self, game, players, captains):
+        players = sum(players, [])  # flatten list
+        team1, team2 = Team("Team 1", game.name), Team("Team 2", game.name)
+        pickpool = []
+        for p in players:
+            nick = self._get_original_nick(p)
+            if self.players.has_key(nick):
+                player = self.players[nick]
+            else:
+                player = Player(nick, None)
+            pickpool.append(player)
+
+        while len(pickpool):
+            team1.auto_add_player(team2, pickpool)
+            team1, team2 = team2, team1  # swap
+        
+        print team1
+        print team2
+        
+        sep = config.get("Xonstat Interface", "teamsuggestion_separator").decode('string-escape')
+        
+        msg = config.get('Xonstat Interface', 'teamsuggestion').decode('string-escape')
+        msg += sep.join([ str(t) for t in [team1,team2] ])
+        self.pickup.pypickupbot.msg( self.pickup.pypickupbot.channel, msg.encode('ascii') )
+
         return
 
     def user_renamed(self, oldname, newname):
