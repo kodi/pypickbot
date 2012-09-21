@@ -96,7 +96,7 @@ class Player:
                 return elos[gt]['elo']
         except:
             pass
-        return 0
+        return None
 
     def get_rank(self, gametype):
         gt = gametype.lower()
@@ -114,8 +114,9 @@ class Team:
     def __init__(self, name, gametype):
         self.players    = []
         self.name       = name
-        self.gametype   = None
+        self.gametype   = ""
         self.elo        = 0
+        self.captain    = None
         
         for target,games in config.items('Xonstat Games'):
             games = [ x.strip() for x in games.decode('string-escape').split(",") ]
@@ -152,8 +153,7 @@ class Team:
         try:
             return float(self.elo) / len(self.players)
         except:
-            pass
-        return 0
+            return 0
 
     def auto_add_player(self, other, pickpool):
         elo_diff = self.get_mean_elo() - other.get_mean_elo()
@@ -164,6 +164,7 @@ class Team:
             if not elo or (elo_diff >  0 and p_elo < elo) or (elo_diff <= 0 and p_elo > elo):
                 elo = p_elo
                 player = p
+                
         print self.name + ": auto-adding {0} ({1} elo)".format(p.nick, p_elo)
         self.add_player(player)
         return player
@@ -171,14 +172,20 @@ class Team:
 
 class Game:
     """A game that can be played in the channel"""
-    def __init__(self, pickup, nick, name, captains=2, players=8, autopick=False, externpick=False, **kwargs):
+    def __init__(self, pickup, nick, name, captains=2, players=8, autopick=True, **kwargs):
         self.pickup = pickup
+        self.xonstat = pickup.xonstat
         self.nick = nick
         self.name = name
         self.caps = int(captains)
         self.maxplayers = int(players)
-        self.autopick = bool(autopick)
-        self.extern_pick = bool(externpick)
+        if type(autopick) == str:
+            if autopick.lower() == "no":
+                self.autopick = False
+            elif autopick.lower() == "yes":
+                self.autopick = True
+        else:
+            self.autopick = bool(autopick)
         self.info = kwargs
         self.players = []
         self.starting = False
@@ -236,96 +243,32 @@ class Game:
             _("%(gamenick)s game ready to start in %(channel)s")
                 % {'gamenick': self.nick, 'channel': self.pickup.pypickupbot.channel})
 
-        captains = []
-
-    def pickup_game_started(self, game, players, captains):
+        # flatten player list ([[a,b],[c,d]] -> [a,b,c,d])
         for p in players:  # flatten list
             if type(p) == list:
                 players.remove(p)
                 players.extend(p)
         
-        gametype = game.nick
-        team1, team2 = Team(_("Team 1"), gametype), Team(_("Team 2"), gametype)
-        if not (team1.is_valid() and team2.is_valid()):
-            return
-        
-        game.pick_extern = True
-        
-        pickpool = []
-        for p in players:
-            nick = self._get_original_nick(p)
-            if self.players.has_key(nick):
-                player = self.players[nick]
-            else:
-                player = Player(nick, None)
-            pickpool.append(player)
-        
-        # randomly select one captain, then select other one with similar elo
-        team1.captain = random.choice(pickpool)
-        best_diff = None
-        print pickpool
-        for p in pickpool:
-            if p == team1.captain:
-                continue
-            elo_diff = team1.captain.get_elo(gametype) - p.get_elo(gametype)
-            if not best_diff or elo_diff < best_diff:
-                team2.captain = p
-                best_diff = elo_diff
-        captains = [ team1.captain, team2.captain ]
-        print "Captains:", team1.captain, ",", team2.captain, "(elo diff:", best_diff, ")"
-        
-        # auto-select players (based on elo)
-        while len(pickpool):
-            p = team1.auto_add_player(team2, pickpool)
-            pickpool.remove(p)
-            team1, team2 = team2, team1  # swap
+        # Set up teams
+        # TODO - randomly constructed team names ("adjective + verb" scheme) ?
+        gametype = self.nick
+        teams = []
 
-        teams = [ team1, team2 ]
-        playerlist  = [str(p) for p in players]
-        captainlist = [str(c) for c in captains]
+        while len(self.teamnames) < self.caps:
+            self.teamnames.append( "Team {0}".format(len(self.teamnames)+1) )
 
-        self.pickup.pypickupbot.cmsg(
-            config.get('Pickup messages', 'game ready autopick').decode('string-escape')%
-            {
-                'nick': game.nick,
-                'playernum': len(players),
-                'playermax': game.maxplayers,
-                'name': game.name,
-                'numcaps': game.caps,
-                'teamslist': ', '.join([
-                    config.get('Pickup messages', 'game ready autopick team').decode('string-escape')%
-                    {
-                        'name': team.name,
-                        'players': ', '.join([ str(p) for p in team.players])
-                    }
-                    for team in teams])
-            })
-        if config.getboolean("Pickup", "PM each player on start"):
-            for player in players:
-                self.pickup.pypickupbot.msg(player, 
-                    config.get("Pickup messages", "youre needed").decode('string-escape')%
-                    {
-                        'channel': self.pickup.pypickupbot.channel,
-                        'name': game.name,
-                        'nick': game.nick,
-                        'numcaps': game.caps,
-                        'playerlist': ', '.join(playerlist),
-                        'captainlist': ', '.join(captainlist)
-                    })
+        for name in self.teamnames:
+            teams.append(Team(name, gametype))
 
-        self.pickup.pypickupbot.fire('pickup_game_started', self, players, captains)
-        self.starting = False
-        return  ################################################################
-
+        captains = []
+        
         if not self.autopick:
             pickpool = sorted(players)
-            captains = random.sample(pickpool,2)
-
-            self.pickup.pypickupbot.fire('pickup_game_starting', self, players, captains)
-            if self.extern_pick:
-                return
+            captains = random.sample(pickpool, self.caps)
             
-            if len( captains ) > 0:
+            self.pickup.pypickupbot.fire('pickup_game_starting', self, players, captains)
+
+            if len(captains) > 0:
                 self.pickup.pypickupbot.msg( self.pickup.pypickupbot.channel,
                     config.get('Pickup messages', 'game ready').decode('string-escape')%
                     {
@@ -335,7 +278,7 @@ class Game:
                         'name': self.name,
                         'numcaps': self.caps,
                         'playerlist': ', '.join(players),
-                        'captainlist': ', '.join(captains)
+                        'captainlist': ', '.join(captains),
                     })
                 if config.getboolean("Pickup", "PM each player on start"):
                     for player in players:
@@ -347,7 +290,7 @@ class Game:
                                 'nick': self.nick,
                                 'numcaps': self.caps,
                                 'playerlist': ', '.join(players),
-                                'captainlist': ', '.join(captains)
+                                'captainlist': ', '.join(captains),
                             })
             else:
                 self.pickup.pypickupbot.msg( self.pickup.pypickupbot.channel,
@@ -371,19 +314,60 @@ class Game:
                                 'numcaps': self.caps,
                                 'playerlist': ', '.join(players),
                             })
-        else:
-            teams = [[] for i in range(self.caps)]
-            players_ = sorted(players)
-            for i in range(len(players)):
-                player = random.choice(players_)
-                players_.remove(player)
-                teams[i % self.caps].append(player)
 
-            self.pickup.pypickupbot.fire('pickup_game_starting', self, teams, captains)
-            if self.extern_pick:
-                return
+        else:  # if not self.autopick
+            # Create a pickpool containing Player instances
+            pickpool = []
+            pickpool_noelo = []
+            for p in players:
+                nick = self.xonstat._get_original_nick(p)
+                if self.xonstat.players.has_key(nick):
+                    pickpool.append(self.xonstat.players[nick])
+                else:
+                    pickpool_noelo.append(Player(p, None))
             
-            self.pickup.pypickupbot.cmsg(
+            # Shuffle pickpool for later use
+            random.shuffle(pickpool)
+            random.shuffle(pickpool_noelo)
+            
+            # Randomly select one captain, then select other one with similar elo
+            # FIXME - only two teams are supported currently - FIXME
+            team1, team2 = teams[:2]
+            team1.captain = random.choice(pickpool)
+            best_diff = None
+            for p in pickpool:
+                if p == team1.captain:
+                    continue
+                elo_diff = team1.captain.get_elo(gametype) - p.get_elo(gametype)
+                if not best_diff or elo_diff < best_diff:
+                    team2.captain = p
+                    best_diff = elo_diff
+            if not team2.captain:
+                team2.captain = random.choice(pickpool_noelo)
+            captains = [ team1.captain, team2.captain ]
+            print "Captains:", team1.captain, ",", team2.captain, "(elo diff:", best_diff, ")"
+                
+            # auto-select players (based on elo)
+            while len(pickpool):
+                p = team1.auto_add_player(team2, pickpool)
+                pickpool.remove(p)
+                team1, team2 = team2, team1  # swap
+                
+            # randomly pick remaining players
+            while len(pickpool_noelo):
+                p = random.choice(pickpool_noelo)
+                team1.add_player(p)
+                pickpool_noelo.remove(p)
+                team1, team2 = team2, team1  # swap
+
+            if len(team1.players) != len(team2.players):
+                print "Teams have different sizes:", team1, team2
+
+            players  = [str(p) for p in players]
+            captains = [str(c) for c in captains]
+
+            self.pickup.pypickupbot.fire('pickup_game_starting', self, players, captains)
+
                 config.get('Pickup messages', 'game ready autopick').decode('string-escape')%
                 {
                     'nick': self.nick,
@@ -394,14 +378,26 @@ class Game:
                     'teamslist': ', '.join([
                         config.get('Pickup messages', 'game ready autopick team').decode('string-escape')%
                         {
-                            'name': self.teamname(i),
-                            'players': ', '.join(team)
+                            'name': team.name,
+                            'players': ', '.join([ str(p) for p in team.players])
                         }
-                        for i, team in enumerate(teams)])
+                        for team in teams]),
+                    'captainlist': ', '.join(captains),
                 })
+            if config.getboolean("Pickup", "PM each player on start"):
+                for player in players:
+                    self.pickup.pypickupbot.msg(player, 
+                        config.get("Pickup messages", "youre needed").decode('string-escape')%
+                        {
+                            'channel': self.pickup.pypickupbot.channel,
+                            'name': self.name,
+                            'nick': self.nick,
+                            'numcaps': self.caps,
+                            'playerlist': ', '.join(players),
+                            'captainlist': ', '.join(captains),
+                        })
 
         self.pickup.pypickupbot.fire('pickup_game_started', self, players, captains)
-
         self.starting = False
 
     def teamname(self, i):
@@ -641,6 +637,12 @@ class XonstatPickupBot:
         Removes you from one or more games"""
         self.get_games(call, args).remove(call, call.nick)
 
+    def renew(self, call, args):
+        """!renew
+        
+        """
+        # TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
+
     def who(self, call, args):
         """!who [game [game ..]]
         
@@ -791,10 +793,11 @@ class XonstatPickupBot:
         elo_list = []
         for gametype,elo in player.get_elo_dict().items():
             eloscore, games = round(elo['elo'], 1), elo['games']
-            if games >= 32:
-                elo_list.append( _("{0}: {1}").format(gametype.upper(), eloscore) )
-            else:
-                elo_list.append( _("{0}: {1}*").format(gametype.upper(), eloscore) )
+            entry = config.get("Xonstat Interface", "playerinfo elo entry").decode('string-escape')%\
+                { 'gametype':gametype, 'elo':eloscore, }
+            if games < 32:
+                entry += "*"
+            elo_list.append(entry)
         elo_list.sort()
         elo_display = sep.join(elo_list)
         if len(elo_list) == 0:
@@ -803,10 +806,9 @@ class XonstatPickupBot:
         rank_list = []
         for gametype,rank in player.get_rank_dict().items():
             rank, max_rank = rank['rank'], rank['max_rank']
-            if max_rank:
-                rank_list.append( _("{0}: {1} of {2}").format(gametype.upper(), rank, max_rank) )
-            else:
-                rank_list.append( _("{0}: {1}").format(gametype.upper(), rank) )
+            entry = config.get("Xonstat Interface", "playerinfo rank entry").decode('string-escape')%\
+                { 'gametype':gametype, 'rank':rank, 'max_rank':max_rank, }
+            rank_list.append(entry)
         rank_list.sort()
         rank_display = sep.join(rank_list)
         if len(rank_list) == 0:
@@ -815,22 +817,26 @@ class XonstatPickupBot:
         reply = config.get("Xonstat Interface", "playerinfo").decode('string-escape')%\
                 { 'nick': nick, 'gamenick': player.get_nick(), }
         if len(elo_list) > 0:
-            reply += config.get("Xonstat Interface", "playerinfo elo").decode('string-escape')%\
+            reply += config.get("Xonstat Interface", "playerinfo elos").decode('string-escape')%\
                 { 'elos': elo_display }
         if len(rank_list) > 0:
-            reply += config.get("Xonstat Interface", "playerinfo rank").decode('string-escape')%\
+            reply += config.get("Xonstat Interface", "playerinfo ranks").decode('string-escape')%\
                 { 'ranks': rank_display, }
         reply += config.get("Xonstat Interface", "playerinfo profile").decode('string-escape')%\
             { 'profile': player.get_xonstat_url(), }
         call.reply(reply)
 
     def playerExists(self, call, args):
+        if not len(args) == 1:
+            raise InputError(_("You must name a player to look up."))
+
         nick = self.xonstat._get_original_nick(args[0])
         player = self.xonstat._find_player(nick)
         if player:
-            reply = _("This nick is registered with player id #{0} (as \x02{1}\x02). " + \
-                    "Use \x02!playerinfo <nick>\x02 to see more details.").\
-                    format(player.get_id(), nick)
+            reply = _("This nick is registered with player id #%(playerid)s (as \x02%(originalnick)s\x02). " + \
+                    "Use \x02%(prefix)splayerinfo %(nick)s\x02 to see more details.")%\
+                    {'prefix':config.get('Bot', 'command prefix'), 'playerid':player.playerid,
+                     'nick':args[0], 'originalnick':nick }
         else:
             reply = _("No player information found for <{0}>.".format(nick))
         call.reply(reply)
@@ -947,6 +953,7 @@ class XonstatPickupBot:
         'remove':           (remove,        COMMAND.NOT_FROM_PM),
             'leave':        (remove,        COMMAND.NOT_FROM_PM),
             'logout':       (remove,        COMMAND.NOT_FROM_PM),
+        'renew':            (renew,         COMMAND.NOT_FROM_PM),
         'who':              (who,           0),
         'promote':          (promote,       COMMAND.NOT_FROM_PM),
         'pull':             (pull,          COMMAND.NOT_FROM_PM | COMMAND.ADMIN),
@@ -958,6 +965,8 @@ class XonstatPickupBot:
         'playerinfo':       (playerInfo,    0),
         'player':           (playerExists,  0),
         'listplayers':      (listPlayers,   0),
+            'playerlist':   (listPlayers,   0),
+        'removeplayer':     (removePlayer,  COMMAND.NOT_FROM_PM | COMMAND.ADMIN),
         'removeplayer':     (removePlayer,  COMMAND.NOT_FROM_PM | COMMAND.ADMIN),
         'clearplayers':     (clearPlayers,  COMMAND.NOT_FROM_PM | COMMAND.ADMIN),
         'purgeplayers':     (purgePlayers,  COMMAND.NOT_FROM_PM | COMMAND.ADMIN),
