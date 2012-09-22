@@ -30,13 +30,13 @@ import httplib
 from twisted.python import log
 
 from pypickupbot.modable import SimpleModuleFactory
-from pypickupbot.irc import COMMAND, InputError
+from pypickupbot.irc import COMMAND, InputError, FetchedList
 from pypickupbot.topic import Topic
 from pypickupbot import db
 from pypickupbot import config
 from pypickupbot.misc import str_from_timediff, timediff_from_str,\
     InvalidTimeDiffString, StringTypes, itime
-    
+
 class Player:
 
     def __init__(self, nick, playerid = None, create_dt = None, index = None):
@@ -565,7 +565,7 @@ class XonstatInterface:
     def _search(self, string):
         result = {}
         for k,p in self.players.items():
-            if string in p.get_nick():
+            if string.lower() in p.get_nick().lower():
                 result[k] = p
         return result
 
@@ -950,6 +950,10 @@ class XonstatPickupBot:
 
         Registers your nick with the given Xonstat account id. If successful, a public message will be shown on the channel.
         """
+        
+        # TODO - only allow if user is authed
+        # FetchedList.has_flag(self.bot, self.bot.channel, nick, <flag>) == True
+        
         if not len(args) == 1:
             raise InputError(_("You must specify your Xonstat profile id to register an account."))
         
@@ -1018,6 +1022,7 @@ class XonstatPickupBot:
 
         Reads games from config"""
         self.xonstat = XonstatInterface()
+        self.bot = bot
         
         self.games = {}
         self.order = []
