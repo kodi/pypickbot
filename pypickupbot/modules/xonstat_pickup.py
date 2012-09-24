@@ -892,6 +892,8 @@ class XonstatPickupBot:
             
         elo_list = []
         for gametype,elo in player.get_elo_dict().items():
+            if gametype == 'overall':
+                continue
             eloscore, games = round(elo['elo'], 1), elo['games']
             entry = config.get("Xonstat Interface", "playerinfo elo entry").decode('string-escape')%\
                 { 'gametype':gametype, 'elo':eloscore, }
@@ -905,6 +907,8 @@ class XonstatPickupBot:
         
         rank_list = []
         for gametype,rank in player.get_rank_dict().items():
+            if gametype == 'overall':
+                continue
             rank, max_rank = rank['rank'], rank['max_rank']
             entry = config.get("Xonstat Interface", "playerinfo rank entry").decode('string-escape')%\
                 { 'gametype':gametype, 'rank':rank, 'max_rank':max_rank, }
@@ -967,12 +971,15 @@ class XonstatPickupBot:
             playerid = int(args[0])
         except ValueError:
             raise InputError(_("Player id must be an integer."))
-                    
+                   
         player = self.xonstat._find_playerid(playerid)
         if player:
-            raise InputError(_("This player id is already registered to {0} (as <{1}>) - can't continue! " + \
-                    "If you need to change your nick, please contact one of the channel operators.").\
-                    format(player.get_nick(), player.nick))
+            # SAFETY FEATURE DROPPED 
+            #raise InputError(_("This player id is already registered to {0} (as <{1}>) - can't continue! " + \
+            #        "If you need to change your nick, please contact one of the channel operators.").\
+            #        format(player.get_nick(), player.nick))
+            self.pypickupbot.msg(_("This player id is already registered to {0} (as <{1}>). Plese check if your input is correct.". \
+                    format(player.get_nick(), player.nick)))
 
         player = Player(nick, playerid)
         if not player.is_valid():
