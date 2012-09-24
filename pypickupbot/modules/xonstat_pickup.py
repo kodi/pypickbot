@@ -47,7 +47,7 @@ class Player:
         self.player_info    = None
 
     def __str__(self):
-        return "{0} (#{1})".format(self.nick, self.playerid)
+        return "{0} (#{1})".format(self.nick.encode('utf-8'), self.playerid)
 
     def get_xonstat_url(self):
         """return xontat url for specific player"""
@@ -89,7 +89,7 @@ class Player:
         try:
             return self._get_player_info()['player']['stripped_nick'].encode('utf-8')
         except:
-            return self.nick
+            return self.nick.encode('utf-8')
 
     def get_elo_dict(self):
         return self._get_player_info()['elos']
@@ -291,8 +291,10 @@ class Game:
             players = sorted(pickpool)
             captains = random.sample(pickpool, self.caps)
 
-            playerlist  = [ p.nick for p in players ]
-            captainlist = [ c.nick for c in captains ]
+            print players, captains
+
+            playerlist  = [ p.nick.encode('utf-8') for p in players ]
+            captainlist = [ c.nick.encode('utf-8') for c in captains ]
             self.pickup.pypickupbot.fire('pickup_game_starting', self, playerlist, captainlist)
 
             if len(captains) > 0:
@@ -304,8 +306,22 @@ class Game:
                         'playermax': self.maxplayers,
                         'name': self.name,
                         'numcaps': self.caps,
-                        'playerlist': ', '.join([ p.get_nick() for p in players ]),
-                        'captainlist': ', '.join([ p.get_nick() for p in captains ]),
+                        'playerlist': ', '.join([
+                                config.get('Pickup messages', 'game ready player').decode('string-escape')%
+                                {
+                                    'nick': player.get_nick(),
+                                    'name': player.nick(),
+                                    'playerid': player.playerid,
+                                }
+                                for player in players]),
+                        'captainlist': ', '.join([
+                                config.get('Pickup messages', 'game ready player').decode('string-escape')%
+                                {
+                                    'nick': player.get_nick(),
+                                    'name': player.nick(),
+                                    'playerid': player.playerid,
+                                }
+                                for player in captains]),
                     })
                 if config.getboolean("Pickup", "PM each player on start"):
                     for player in players:
@@ -316,8 +332,22 @@ class Game:
                                 'name': self.name,
                                 'nick': self.nick,
                                 'numcaps': self.caps,
-                                'playerlist': ', '.join([ p.get_nick() for p in players ]),
-                                'captainlist': ', '.join([ p.get_nick() for p in captains ]),
+                                'playerlist': ', '.join([
+                                    config.get('Pickup messages', 'game ready player').decode('string-escape')%
+                                    {
+                                        'nick': player.get_nick(),
+                                        'name': player.nick.encode('utf-8'),
+                                        'playerid': player.playerid,
+                                    }
+                                    for player in players]),
+                                'captainlist': ', '.join([
+                                config.get('Pickup messages', 'game ready player').decode('string-escape')%
+                                    {
+                                        'nick': player.get_nick(),
+                                        'name': player.nick.encode('utf-8'),
+                                        'playerid': player.playerid,
+                                    }
+                                    for player in captains]),
                             })
             else:
                 self.pickup.pypickupbot.cmsg(
@@ -328,7 +358,14 @@ class Game:
                         'playermax': self.maxplayers,
                         'name': self.name,
                         'numcaps': self.caps,
-                        'playerlist': ', '.join([ p.get_nick() for p in players ])
+                        'playerlist': ', '.join([
+                                config.get('Pickup messages', 'game ready player').decode('string-escape')%
+                                {
+                                    'nick': player.get_nick(),
+                                    'name': player.nick.encode('utf-8'),
+                                    'playerid': player.playerid,
+                                }
+                                for player in players]),
                     })
                 if config.getboolean("Pickup", "PM each player on start"):
                     for player in players:
@@ -339,7 +376,14 @@ class Game:
                                 'name': self.name,
                                 'nick': self.nick,
                                 'numcaps': self.caps,
-                                'playerlist': ', '.join([ p.get_nick() for p in players ]),
+                                'playerlist': ', '.join([
+                                    config.get('Pickup messages', 'game ready player').decode('string-escape')%
+                                    {
+                                        'nick': player.get_nick(),
+                                        'name': player.nick.encode('utf-8'),
+                                        'playerid': player.playerid,
+                                    }
+                                    for player in players]),
                             })
 
         else:  # if not self.autopick
@@ -384,8 +428,10 @@ class Game:
             else:
                 team1.captain, team2.captain = random.sample(pickpool_noelo, 2)
                 print "Random captains:", team1.captain, ",", team2.captain
-            captains = [ team1.captain, team2.captain ]
                 
+            players = pickpool + pickpool_noelo
+            captains = [ team1.captain, team2.captain ]
+
             # auto-select players (based on elo)
             while len(pickpool):
                 p = team1.auto_add_player(team2, pickpool)
@@ -402,8 +448,10 @@ class Game:
             if len(team1.players) != len(team2.players):
                 print "Teams have different sizes:", team1, team2
 
-            playerlist  = [p.nick for p in pickpool+pickpool_noelo]
-            captainlist = [c.nick for c in captains]
+            print players, teams
+
+            playerlist  = [p.nick.encode('utf-8') for p in players]
+            captainlist = [c.nick.encode('utf-8') for c in captains]
             self.pickup.pypickupbot.fire('pickup_game_starting', self, playerlist, captainlist)
 
             self.pickup.pypickupbot.cmsg(
@@ -418,11 +466,25 @@ class Game:
                         config.get('Pickup messages', 'game ready autopick team').decode('string-escape')%
                         {
                             'name': team.name,
-                            'players': ', '.join([ p.get_nick() for p in team.players]),
+                            'players': ', '.join([
+                                config.get('Pickup messages', 'game ready player').decode('string-escape')%
+                                {
+                                    'nick': player.get_nick(),
+                                    'name': player.nick.encode('utf-8'),
+                                    'playerid': player.playerid,
+                                }
+                                for player in team.players]),
                             'mean_elo': round(team.mean_elo(),1),
                         }
                         for team in teams]),
-                    'captainlist': ', '.join([ p.get_nick() for p in captains ]),
+                    'captainlist': ', '.join([
+                                config.get('Pickup messages', 'game ready player').decode('string-escape')%
+                                {
+                                    'nick': player.get_nick(),
+                                    'name': player.nick.encode('utf-8'),
+                                    'playerid': player.playerid,
+                                }
+                                for player in captains]),
                     'elo_diff': captain_elo_diff,
                 })
             if config.getboolean("Pickup", "PM each player on start"):
@@ -434,11 +496,25 @@ class Game:
                             'name': self.name,
                             'nick': self.nick,
                             'numcaps': self.caps,
-                            'playerlist': ', '.join([ p.get_nick() for p in players ]),
-                            'captainlist': ', '.join([ p.get_nick() for p in captains ]),
+                            'playerlist': ', '.join([
+                                config.get('Pickup messages', 'game ready player').decode('string-escape')%
+                                {
+                                    'nick': player.get_nick(),
+                                    'name': player.nick.encode('utf-8'),
+                                    'playerid': player.playerid,
+                                }
+                                for player in players]),
+                            'captainlist': ', '.join([
+                                config.get('Pickup messages', 'game ready player').decode('string-escape')%
+                                {
+                                    'nick': player.get_nick(),
+                                    'name': player.nick.encode('utf-8'),
+                                    'playerid': player.playerid,
+                                }
+                                for player in captains]),
                         })
 
-        self.pickup.pypickupbot.fire('pickup_game_started', self, players, captains)
+        self.pickup.pypickupbot.fire('pickup_game_started', self, playerlist, captainlist)
         self.starting = False
 
     def teamname(self, i):
@@ -460,7 +536,9 @@ class Game:
     def who(self):
         """Who is in this game"""
         if len(self.players):
-            return config.get('Pickup messages', 'who game').decode('string-escape') % {'nick': self.nick, 'playernum': len(self.players), 'playermax': self.maxplayers, 'name': self.name, 'numcaps': self.caps, 'playerlist': ', '.join(self.players) }
+            return config.get('Pickup messages', 'who game').decode('string-escape')%
+                {'nick': self.nick, 'playernum': len(self.players), 'playermax': self.maxplayers,
+                'name': self.name, 'numcaps': self.caps, 'playerlist': ', '.join(self.players) }
 
     def remove(self, call, user):
         """Removes a player from this game"""
@@ -523,7 +601,6 @@ class XonstatInterface:
 
     def __init__(self):
         self.players = {}       # nick : playerid
-        #self.nickchanges = {}   # newname : originalname
 
         def _done(args):
             self._load_from_db()
@@ -601,25 +678,6 @@ class XonstatInterface:
             INSERT INTO xonstat_players(nick, playerid, create_dt)
             VALUES      (:nick, :playerid, :ctime)
             """, (nick, playerid, itime(),))
-
-#    def _get_nick(self, nick):
-#        if self.nickchanges.has_key(nick):
-#            return self.nickchanges[nick]
-#        return nick
-
-#    def _get_original_nick(self, nick):
-#        for old,new in self.nickchanges.items():
-#            if new == nick:
-#                return old
-#        return nick
-
-#    def _rename_user(self, oldname, newname):
-#        original = self._get_original_nick(oldname)
-#        if newname == original:
-#            if self.xonstat.nickchanges.has_key(oldname):
-#                del self.nickchanges.has_key[oldname]
-#        else:
-#            self.nickchanges[original] = newname
 
     def _get_nick(self, nick):
         return nick
@@ -851,10 +909,18 @@ class XonstatPickupBot:
             call.reply(_("No players registered yet."))
             return
         
-        reply = config.get("Xonstat Interface", "playerlist").decode('string-escape')%\
-                { 'players': ", ".join(["({1}) {0}".format(k, players[k].index) for k in players.keys()]),
-                  'num_players': len(players), }
-        call.reply(reply)
+        def doCall(is_op):
+            keys = sorted(players.keys())
+            if is_op:
+                reply = config.get("Xonstat Interface", "playerlist").decode('string-escape')%\
+                        { 'players': ", ".join(["{0} ({1})".format(k, players[k].index) for k in keys]),
+                          'num_players': len(players), }
+            else:        
+                reply = config.get("Xonstat Interface", "playerlist").decode('string-escape')%\
+                        { 'players': ", ".join(["{0}".format(players[k].index) for k in keys]),
+                          'num_players': len(players), }
+            call.reply(reply)
+        FetchedList.has_flag(self.pypickupbot, self.pypickupbot.channel, call.nick, 'o').addCallback(do_call)        
 
     def searchPlayers(self, call, args):
         """!searchplayers <text>
@@ -966,7 +1032,7 @@ class XonstatPickupBot:
         if player:
             raise InputError(_("This nick is already registered with player id #{0} (as <{1}>) - can't continue! " + \
                     "If you need to change your player id, please contact one of the channel operators.").\
-                    format(player.get_id(), player.nick))
+                    format(player.get_id(), player.nick.encode('utf-8')))
         try:
             playerid = int(args[0])
         except ValueError:
@@ -977,9 +1043,9 @@ class XonstatPickupBot:
             # SAFETY FEATURE DROPPED 
             #raise InputError(_("This player id is already registered to {0} (as <{1}>) - can't continue! " + \
             #        "If you need to change your nick, please contact one of the channel operators.").\
-            #        format(player.get_nick(), player.nick))
+            #        format(player.get_nick(), player.nick.encode('utf-8')))
             self.pypickupbot.msg(_("This player id is already registered to {0} (as <{1}>). Plese check if your input is correct.". \
-                    format(player.get_nick(), player.nick)))
+                    format(player.get_nick(), player.nick.encode('utf-8'))))
 
         player = Player(nick, playerid)
         if not player.is_valid():
