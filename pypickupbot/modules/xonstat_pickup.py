@@ -26,6 +26,7 @@ from datetime import datetime
 import random
 import json
 import httplib
+import re
 
 from twisted.python import log
 
@@ -85,11 +86,88 @@ class Player:
             return False
         return True
 
+    def _irc_colors(self, qstr, bold=False):
+        _irc_colors = [ -1, 4, 9, 8, 12, 11, 13, -1, -1, -1 ]
+        def _rgb_to_simple(r,g,b):
+            # this was basically taken from rcon2irc.pl
+            min_ = min(r,g,b)
+            max_ = max(r,g,b)
+            
+            v = max_ / 15.0
+            s = (1 - min_/max_) if max_ != min_ else 0
+            
+            if s < 0.2:
+                return 0 if v < 0.5 else 7
+                
+            if max_ == min_:
+                h = 0
+            elif max_ == r:
+                h = (60 * (g - b) / (max_ - min_)) % 360
+            elif max_ == g:
+                h = (60 * (b - r) / (max_ - min_)) + 120
+            elif max_ == b:
+                h = (60 * (r - g) / (max_ - min_)) + 240
+            
+            if h < 36:  
+                return 1
+            elif h < 80:
+                return 3
+            elif h < 150:
+                return 2
+            elif h < 200:
+                return 5
+            elif h < 270:
+                return 4
+            elif h < 330:
+                return 6
+            else:
+                return 1
+
+        _all_colors = re.compile(r'(\^\d|\^x[\dA-Fa-f]{3})')
+        parts = _all_colors.split(qstr)
+        result = "\002"
+        oldcolor = None
+        while len(parts) > 0:
+            tag = None
+            txt = parts[0]
+            if _all_colors.match(txt):
+                tag = txt[1:]  # strip leading '^'
+                if len(parts) < 2:
+                    break
+                txt = parts[1]
+                del parts[1]
+            del parts[0]
+                
+            if not txt or len(txt) == 0:
+                # only colorcode and no real text, skip this
+                continue
+            
+            color = 7
+            if tag:
+                if len(tag) == 4 and tag[0] == 'x':
+                    r = int(tag[1], 16)
+                    g = int(tag[2], 16)
+                    b = int(tag[3], 16)
+                    color = _rgb_to_simple(r,g,b)
+                elif len(tag) == 1 and tag[0] in range(0,10):
+                    color = int(tag[0])
+            color = _irc_colors[color]
+            if color != oldcolor:
+                if color < 0:
+                    result += "\017\002"
+                else:
+                    result += "\003" + str(color)
+            result += txt
+            oldcolor = color
+        result += "\017"
+        return result
+    
     def get_nick(self):
         try:
-            return self._get_player_info()['player']['stripped_nick'].encode('utf-8')
+            nick = self._get_player_info()['player']['nick'].encode('utf-8')
         except:
-            return self.nick.encode('utf-8')
+            nick = self.nick.encode('utf-8')
+        return self._irc_colors(nick, bold=True)
 
     def get_elo_dict(self):
         return self._get_player_info()['elos']
@@ -536,7 +614,7 @@ class Game:
     def who(self):
         """Who is in this game"""
         if len(self.players):
-            return config.get('Pickup messages', 'who game').decode('string-escape')%
+            return config.get('Pickup messages', 'who game').decode('string-escape')%\
                 {'nick': self.nick, 'playernum': len(self.players), 'playermax': self.maxplayers,
                 'name': self.name, 'numcaps': self.caps, 'playerlist': ', '.join(self.players) }
 
@@ -909,7 +987,7 @@ class XonstatPickupBot:
             call.reply(_("No players registered yet."))
             return
         
-        def doCall(is_op):
+        def do_call(is_op):
             keys = sorted(players.keys())
             if is_op:
                 reply = config.get("Xonstat Interface", "playerlist").decode('string-escape')%\
