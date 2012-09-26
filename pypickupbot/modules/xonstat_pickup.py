@@ -1041,6 +1041,9 @@ class XonstatPickupBot:
             eloscore, games = round(elo['elo'], 1), elo['games']
             entry = config.get("Xonstat Interface", "playerinfo elo entry").decode('string-escape')%\
                 { 'gametype':gametype, 'elo':eloscore, }
+            if games < 8:
+                # don't show elos with little number of games
+                continue
             if games < 32:
                 entry += "*"
             elo_list.append(entry)
@@ -1240,7 +1243,6 @@ class XonstatPickupBot:
             'info':         (playerInfo,    0),
         'player':           (playerExists,  0),
         'listplayers':      (listPlayers,   0),
-            'playerlist':   (listPlayers,   0),
             'list':         (listPlayers,   0),
         'searchplayers':    (searchPlayers, 0),
             'search':       (searchPlayers, 0),
