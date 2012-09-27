@@ -712,10 +712,11 @@ class XonstatInterface:
         return None
 
     def _find_playerid(self, playerid):
-        for p in self.players.values():
-            if p.playerid == playerid:
-                return p
-        return None
+        result = {}
+        for k,p in self.players.items():
+            if int(p.playerid) == int(playerid):
+                result[k] = p
+        return result
 
     def _search(self, string):
         result = {}
@@ -977,6 +978,31 @@ class XonstatPickupBot:
                 call.reply(_("Cancelled."))
         d.addCallback(_confirmed)
 
+    def whois(self, call, args):
+        """!whois <playerid>
+        
+        Shows all nicks that have registered to a given playerid."""
+        if not len(args) == 1:
+            raise InputError("You need to specify a playerid to lookup.")
+            
+        players = self.xonstat._find_playerid(args[0])
+        if len(players) == 0:
+            call.reply(_("No players found."))
+            return
+    
+        def do_call(is_op):
+            keys = sorted(players.keys())
+            if is_op:
+                reply = config.get("Xonstat Interface", "player whois").decode('string-escape')%\
+                        { 'players': ", ".join(["{0} ({1})".format(k, players[k].index) for k in keys]),
+                          'num_players': len(players), 'gamenick': players.values()[0].get_nick(), }
+            else:        
+                reply = config.get("Xonstat Interface", "player whois").decode('string-escape')%\
+                        { 'players': ", ".join(["{0}".format(players[k].index) for k in keys]),
+                          'num_players': len(players), 'gamenick': players.values()[0].get_nick(), }
+            call.reply(reply)
+        FetchedList.has_flag(self.pypickupbot, self.pypickupbot.channel, call.nick, 'o').addCallback(do_call)        
+
     def listPlayers(self, call, args):
         """!listplayers
 
@@ -990,11 +1016,11 @@ class XonstatPickupBot:
         def do_call(is_op):
             keys = sorted(players.keys())
             if is_op:
-                reply = config.get("Xonstat Interface", "playerlist").decode('string-escape')%\
+                reply = config.get("Xonstat Interface", "player list").decode('string-escape')%\
                         { 'players': ", ".join(["{0} ({1})".format(k, players[k].index) for k in keys]),
                           'num_players': len(players), }
             else:        
-                reply = config.get("Xonstat Interface", "playerlist").decode('string-escape')%\
+                reply = config.get("Xonstat Interface", "player list").decode('string-escape')%\
                         { 'players': ", ".join(["{0}".format(players[k].index) for k in keys]),
                           'num_players': len(players), }
             call.reply(reply)
@@ -1013,7 +1039,7 @@ class XonstatPickupBot:
             call.reply(_("No players found."))
             return
         
-        reply = config.get("Xonstat Interface", "playerlist").decode('string-escape')%\
+        reply = config.get("Xonstat Interface", "player search").decode('string-escape')%\
                 { 'players': ", ".join([ "({1}) {0}".format(k, players[k].index) for k in players.keys() ]),
                   'num_players': len(players), }
         call.reply(reply)
@@ -1239,6 +1265,7 @@ class XonstatPickupBot:
         'pickups':          (pickups,       0),
         
         'register':         (register,      COMMAND.NOT_FROM_PM),
+        'whois':            (whois,         0),
         'playerinfo':       (playerInfo,    0),
             'info':         (playerInfo,    0),
         'player':           (playerExists,  0),
