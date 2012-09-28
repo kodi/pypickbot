@@ -837,7 +837,8 @@ class XonstatPickupBot:
     def add(self, call, args):
         """!add [game [game ..]]
 
-        Signs you up for one or more games"""
+        Signs you up for one or more games.
+	"""
         self.get_games(call, args,
             config.getboolean("Pickup", "implicit all games in add"))\
             .add(call, call.nick)
@@ -845,7 +846,8 @@ class XonstatPickupBot:
     def remove(self, call, args):
         """!remove [game [game ..]]
 
-        Removes you from one or more games"""
+        Removes you from one or more games.
+	"""
         self.get_games(call, args).remove(call, call.nick)
 
     def renew(self, call, args):
@@ -854,10 +856,16 @@ class XonstatPickupBot:
         """
         # TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
 
+	# The !renew command is to be used together with the timout feature,
+	# where a player is removed automatically if there was no activity 
+	# in the channel for some time. Players are required to !renew their
+	# games to stay added.
+
     def who(self, call, args):
         """!who [game [game ..]]
         
-        Shows who has signed up"""
+        Shows who has signed up.
+	"""
         games = [i for i in self.get_games(call, args).who() if i != None]
         all = False
         if len(args) < 1 or len(args) == len(self.games):
@@ -880,7 +888,8 @@ class XonstatPickupBot:
     def promote(self, call, args):
         """!promote <game>
 
-        Shows a notice encouraging players to sign up for the specified game"""
+        Shows a notice encouraging players to sign up for the specified game.
+	"""
         admin = self.pypickupbot.is_admin(call.user, call.nick)
 
         def _knowAdmin(admin):
@@ -909,7 +918,8 @@ class XonstatPickupBot:
     def pull(self, call, args):
         """!pull <player> [game [game ..]]
 
-        Removes someone else from one or more games"""
+        Removes someone else from one or more games.
+	"""
         player = args.pop(0)
         games = self.get_games(call, args).force_remove(player)
 
@@ -926,7 +936,8 @@ class XonstatPickupBot:
     def abort(self, call, args):
         """!abort [game [game ..]]
         
-        Aborts a game"""
+        Aborts a game.
+	"""
         self.get_games(call, args).abort()
 
     def pickups(self, call, args):
@@ -943,8 +954,7 @@ class XonstatPickupBot:
     def clearPlayers(self, call, args):
         """!clearplayers
         
-        Clears the registered players list completely.
-        Prefer the purgeplayers command to this."""
+        Clears the registered players list completely. Prefer the purgeplayers command to this."""
         d = call.confirm("This will delete all registered players, continue?")
         def _confirmed(ret):
             if ret:
@@ -958,8 +968,7 @@ class XonstatPickupBot:
     def purgePlayers(self, call, args):
         """!purgeplayers <keep>
 
-        Purges the registered players list from entries created later than
-        [keep] ago."""
+        Purges the registered players list from entries created later than [keep] ago."""
         if not len(args) == 1:
             raise InputError(_("You need to specify a time range."))
         try:
@@ -981,7 +990,7 @@ class XonstatPickupBot:
     def whois(self, call, args):
         """!whois <playerid>
         
-        Shows all nicks that have registered to a given playerid."""
+        Shows all nicks that have registered to a given playerid. This is useful to find out who has registered to a specific Xonstat account."""
         if not len(args) == 1:
             raise InputError("You need to specify a playerid to lookup.")
             
@@ -1029,7 +1038,7 @@ class XonstatPickupBot:
     def searchPlayers(self, call, args):
         """!searchplayers <text>
 
-        Finds all players that have registered with the bot's Xonstat interface and whose nicks contain the given text.
+        Finds all players that have registered with the bot's Xonstat interface and whose nicks contain the given text. Ops will get the database indices in addition to the registered names (e.g. to remove players).
         """
         if not len(args) == 1:
             raise InputError("You need to specify a text to search for.")
@@ -1047,7 +1056,7 @@ class XonstatPickupBot:
     def playerInfo(self, call, args):
         """!playerinfo <nick>
 
-        Shows details about a registered player (information from Xonstat).
+        Shows details about a registered player (information from Xonstat). You need to specify the player's IRC nick to look up.
         """
         if not len(args) == 1:
             raise InputError("You need to specify a player nickname.")
@@ -1126,6 +1135,7 @@ class XonstatPickupBot:
         """!register <xonstat #id>
 
         Registers your nick with the given Xonstat account id. If successful, a public message will be shown on the channel.
+	Note that you can register more than one nick to a Xonstat account (e.g. if you use multiple nicks on IRC).
         """
         
         # TODO - only allow if user is authed
@@ -1177,9 +1187,11 @@ class XonstatPickupBot:
         d.addCallback(_confirmed)
 
     def removePlayer(self, call, args):
-        """!removeplayer <nick>
+        """!removeplayer <nick|index>
 
         Removes a specific player from the bot's Xonstat database.
+
+	Using the index allows to delete a specific from the database. Ops can use !listplayers to find out the index.
         """
         if not len(args) == 1:
             raise InputError(_("You need to specify one player name."))
