@@ -59,19 +59,18 @@ class Player:
 
     def _get_xonstat_json(self, request):
         server = config.get("Xonstat Interface", "server").decode('string-escape')
+	data = ""
         try:
             http = httplib.HTTPConnection(server)
             http.connect()
             http.request("GET", request)
             response = http.getresponse()
+            data = response.read()
             http.close()
         except:
-            return None
-        try:
-            json_data = json.loads(response.read())
-            return json_data[0]  # dict embedded in a list
-        except:
             return {}
+        json_data = json.loads(data)
+        return json_data[0]  # dict embedded in a list
 
     def _get_player_info(self):
         if not self.player_info:
