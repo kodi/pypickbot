@@ -123,6 +123,7 @@ class Player:
                 return 1
 
         _all_colors = re.compile(r'(\^\d|\^x[\dA-Fa-f]{3})')
+        #qstr = ''.join([ x if ord(x) < 128 else '' for x in qstr ]).replace('^^', '^').replace(u'\x00', '') # strip weird characters
         parts = _all_colors.split(qstr)
         result = "\002"
         oldcolor = None
@@ -148,7 +149,7 @@ class Player:
                     g = int(tag[2], 16)
                     b = int(tag[3], 16)
                     color = _rgb_to_simple(r,g,b)
-                elif len(tag) == 1 and tag[0] in range(0,10):
+                elif len(tag) == 1 and int(tag[0]) in range(0,10):
                     color = int(tag[0])
             color = _irc_colors[color]
             if color != oldcolor:
@@ -163,9 +164,9 @@ class Player:
     
     def get_nick(self):
         try:
-            nick = self._get_player_info()['player']['nick'].encode('utf-8')
+            nick = self._get_player_info()['player']['nick'].encode('latin1','ignore')
         except:
-            nick = self.nick.encode('utf-8')
+            nick = self.nick.encode('latin1','ignore')
         return self._irc_colors(nick, bold=True)
 
     def get_elo_dict(self):
@@ -392,7 +393,7 @@ class Game:
                                 }
                                 for player in players]),
                         'captainlist': ', '.join([
-                                config.get('Pickup messages', 'game ready player').decode('string-escape')%
+                                config.get('Pickup messages', 'game ready captain').decode('string-escape')%
                                 {
                                     'nick': player.get_nick(),
                                     'name': player.nick(),
@@ -418,7 +419,7 @@ class Game:
                                     }
                                     for player in players]),
                                 'captainlist': ', '.join([
-                                config.get('Pickup messages', 'game ready player').decode('string-escape')%
+                                config.get('Pickup messages', 'game ready captain').decode('string-escape')%
                                     {
                                         'nick': player.get_nick(),
                                         'name': player.nick.encode('utf-8'),
@@ -498,7 +499,7 @@ class Game:
                         team2.captain = p
                         best_diff = elo_diff
                 if team2.captain:
-                    captain_elo_diff = round(abs(best_diff),0)
+                    captain_elo_diff = round(abs(best_diff),1)
                 else:
                     team2.captain = random.choice(pickpool_noelo)
                 print "Autopick captains:", team1.captain, ",", team2.captain, "(elo diff:", captain_elo_diff, ")"
@@ -555,7 +556,7 @@ class Game:
                         }
                         for team in teams]),
                     'captainlist': ', '.join([
-                                config.get('Pickup messages', 'game ready player').decode('string-escape')%
+                                config.get('Pickup messages', 'game ready captain').decode('string-escape')%
                                 {
                                     'nick': player.get_nick(),
                                     'name': player.nick.encode('utf-8'),
@@ -582,7 +583,7 @@ class Game:
                                 }
                                 for player in players]),
                             'captainlist': ', '.join([
-                                config.get('Pickup messages', 'game ready player').decode('string-escape')%
+                                config.get('Pickup messages', 'game ready captain').decode('string-escape')%
                                 {
                                     'nick': player.get_nick(),
                                     'name': player.nick.encode('utf-8'),
@@ -1006,7 +1007,7 @@ class XonstatPickupBot:
                           'num_players': len(players), 'gamenick': players.values()[0].get_nick(), }
             else:        
                 reply = config.get("Xonstat Interface", "player whois").decode('string-escape')%\
-                        { 'players': ", ".join(["{0}".format(players[k].index) for k in keys]),
+                        { 'players': ", ".join(["{0}".format(k) for k in keys]),
                           'num_players': len(players), 'gamenick': players.values()[0].get_nick(), }
             call.reply(reply)
         FetchedList.has_flag(self.pypickupbot, self.pypickupbot.channel, call.nick, 'o').addCallback(do_call)        
@@ -1029,7 +1030,7 @@ class XonstatPickupBot:
                           'num_players': len(players), }
             else:        
                 reply = config.get("Xonstat Interface", "player list").decode('string-escape')%\
-                        { 'players': ", ".join(["{0}".format(players[k].index) for k in keys]),
+                        { 'players': ", ".join(["{0}".format(k) for k in keys]),
                           'num_players': len(players), }
             call.reply(reply)
         FetchedList.has_flag(self.pypickupbot, self.pypickupbot.channel, call.nick, 'o').addCallback(do_call)        
@@ -1134,7 +1135,7 @@ class XonstatPickupBot:
         """!register <xonstat #id>
 
         Registers your nick with the given Xonstat account id. If successful, a public message will be shown on the channel.
-	Note that you can register more than one nick to a Xonstat account (e.g. if you use multiple nicks on IRC).
+        Note that you can register more than one nick to a Xonstat account (e.g. if you use multiple nicks on IRC).
         """
         
         # TODO - only allow if user is authed
@@ -1160,8 +1161,9 @@ class XonstatPickupBot:
             #raise InputError(_("This player id is already registered to {0} (as <{1}>) - can't continue! " + \
             #        "If you need to change your nick, please contact one of the channel operators.").\
             #        format(player.get_nick(), player.nick.encode('utf-8')))
-            self.pypickupbot.msg(_("This player id is already registered to {0} (as <{1}>). Plese check if your input is correct.". \
-                    format(player.get_nick(), player.nick.encode('utf-8'))))
+            self.pypickupbot.msg(self.pypickupbot.channel,
+                    _("This player id is already registered! Plese check if your input is correct before you continue. Use !whois {0} to look up who registered to this player id").\
+                    format(playerid))
 
         player = Player(nick, playerid)
         if not player.is_valid():
