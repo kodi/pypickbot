@@ -1,4 +1,3 @@
-# pypickupbot - An ircbot that helps game players to play organized games
 #               with captain-picked teams.
 #     Copyright (C) 2010 pypickupbot authors
 #
@@ -660,7 +659,11 @@ class LineProcessor:
             self._split_reply(msg, split, 0)
             return
         log.msg('Replying to %s: %s'%(self.nick, msg))
-        self.bot.notice(self.nick, str(msg))
+        # FIXME - encoding should be set somewhere - FIXME
+        if isinstance(msg, unicode):
+            msg = msg.encode("utf-8")
+        self.bot.notice(self.nick, msg)
+        
 
     def _split_reply(self, msg, split, times):
         """Splits a reply into multiple messages.

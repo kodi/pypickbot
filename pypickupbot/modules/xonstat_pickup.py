@@ -48,7 +48,7 @@ class Player:
         self.player_info    = None
 
     def __str__(self):
-        return "{0} (#{1})".format(self.nick.encode('utf-8'), self.playerid)
+        return "{0} (#{1})".format(self.nick, self.playerid)
 
     def get_xonstat_url(self):
         """return xontat url for specific player"""
@@ -164,9 +164,9 @@ class Player:
     
     def get_nick(self):
         try:
-            nick = self._get_player_info()['player']['nick'].encode('latin1','ignore')
+            nick = self._get_player_info()['player']['nick']
         except:
-            nick = self.nick.encode('latin1','ignore')
+            nick = self.nick
         return self._irc_colors(nick, bold=True)
 
     def get_elo_dict(self):
@@ -414,7 +414,7 @@ class Game:
                                     config.get('Pickup messages', 'game ready player').decode('string-escape')%
                                     {
                                         'nick': player.get_nick(),
-                                        'name': player.nick.encode('utf-8'),
+                                        'name': player.nick,
                                         'playerid': player.playerid,
                                     }
                                     for player in players]),
@@ -422,7 +422,7 @@ class Game:
                                 config.get('Pickup messages', 'game ready captain').decode('string-escape')%
                                     {
                                         'nick': player.get_nick(),
-                                        'name': player.nick.encode('utf-8'),
+                                        'name': player.nick,
                                         'playerid': player.playerid,
                                     }
                                     for player in captains]),
@@ -440,7 +440,7 @@ class Game:
                                 config.get('Pickup messages', 'game ready player').decode('string-escape')%
                                 {
                                     'nick': player.get_nick(),
-                                    'name': player.nick.encode('utf-8'),
+                                    'name': player.nick,
                                     'playerid': player.playerid,
                                 }
                                 for player in players]),
@@ -458,7 +458,7 @@ class Game:
                                     config.get('Pickup messages', 'game ready player').decode('string-escape')%
                                     {
                                         'nick': player.get_nick(),
-                                        'name': player.nick.encode('utf-8'),
+                                        'name': player.nick,
                                         'playerid': player.playerid,
                                     }
                                     for player in players]),
@@ -548,7 +548,7 @@ class Game:
                                 config.get('Pickup messages', 'game ready player').decode('string-escape')%
                                 {
                                     'nick': player.get_nick(),
-                                    'name': player.nick.encode('utf-8'),
+                                    'name': player.nick,
                                     'playerid': player.playerid,
                                 }
                                 for player in team.players]),
@@ -559,7 +559,7 @@ class Game:
                                 config.get('Pickup messages', 'game ready captain').decode('string-escape')%
                                 {
                                     'nick': player.get_nick(),
-                                    'name': player.nick.encode('utf-8'),
+                                    'name': player.nick,
                                     'playerid': player.playerid,
                                 }
                                 for player in captains]),
@@ -578,7 +578,7 @@ class Game:
                                 config.get('Pickup messages', 'game ready player').decode('string-escape')%
                                 {
                                     'nick': player.get_nick(),
-                                    'name': player.nick.encode('utf-8'),
+                                    'name': player.nick,
                                     'playerid': player.playerid,
                                 }
                                 for player in players]),
@@ -586,7 +586,7 @@ class Game:
                                 config.get('Pickup messages', 'game ready captain').decode('string-escape')%
                                 {
                                     'nick': player.get_nick(),
-                                    'name': player.nick.encode('utf-8'),
+                                    'name': player.nick,
                                     'playerid': player.playerid,
                                 }
                                 for player in captains]),
@@ -1149,7 +1149,7 @@ class XonstatPickupBot:
         if player:
             raise InputError(_("This nick is already registered with player id #{0} (as <{1}>) - can't continue! " + \
                     "If you need to change your player id, please contact one of the channel operators.").\
-                    format(player.get_id(), player.nick.encode('utf-8')))
+                    format(player.get_id(), player.nick))
         try:
             playerid = int(args[0])
         except ValueError:
@@ -1160,7 +1160,7 @@ class XonstatPickupBot:
             # SAFETY FEATURE DROPPED 
             #raise InputError(_("This player id is already registered to {0} (as <{1}>) - can't continue! " + \
             #        "If you need to change your nick, please contact one of the channel operators.").\
-            #        format(player.get_nick(), player.nick.encode('utf-8')))
+            #        format(player.get_nick(), player.nick))
             self.pypickupbot.msg(self.pypickupbot.channel,
                     _("This player id is already registered! Plese check if your input is correct before you continue. Use !whois {0} to look up who registered to this player id").\
                     format(playerid))
@@ -1180,7 +1180,7 @@ class XonstatPickupBot:
                         call.reply("Done.")
                         msg = config.get('Xonstat Interface', 'player registered').decode('string-escape')%\
                             { 'nick': nick, 'playerid': playerid, 'gamenick': player.get_nick(), 'profile': player.get_xonstat_url(), }
-                        self.pypickupbot.msg( self.pypickupbot.channel, msg.encode('ascii') )
+                        self.pypickupbot.msg( self.pypickupbot.channel, msg )
                     self.xonstat._load_from_db().addCallback(done)
                 self.xonstat._insert(nick, playerid).addCallback(done)
             else:
