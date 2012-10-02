@@ -379,8 +379,7 @@ class Game:
             self.pickup.pypickupbot.fire('pickup_game_starting', self, playerlist, captainlist)
 
             if len(captains) > 0:
-                self.pickup.pypickupbot.cmsg(
-                    config.get('Pickup messages', 'game ready').decode('string-escape')%
+                cmsg = config.get('Pickup messages', 'game ready').decode('string-escape')%\
                     {
                         'nick': self.nick,
                         'playernum': len(self.players),
@@ -403,7 +402,9 @@ class Game:
                                     'playerid': player.playerid,
                                 }
                                 for player in captains]),
-                    })
+                    }
+                self.pickup.pypickupbot.cmsg(cmsg.encode('utf-8'))
+                
                 if config.getboolean("Pickup", "PM each player on start"):
                     for player in players:
                         msg = config.get("Pickup messages", "youre needed").decode('string-escape')%\
@@ -429,10 +430,10 @@ class Game:
                                     }
                                     for player in captains]),
                             }
-                        self.pickup.pypickupbot.msg(player, msg.encode("utf-8"))
+                        self.pickup.pypickupbot.msg(player, msg.encode('utf-8'))
+                        
             else:
-                self.pickup.pypickupbot.cmsg(
-                    config.get('Pickup messages', 'game ready nocaptains').decode('string-escape')%
+                cmsg = config.get('Pickup messages', 'game ready nocaptains').decode('string-escape')%\
                     {
                         'nick': self.nick,
                         'playernum': len(self.players),
@@ -447,7 +448,9 @@ class Game:
                                     'playerid': player.playerid,
                                 }
                                 for player in players]),
-                    })
+                    }
+                self.pickup.pypickupbot.cmsg(cmsg.encode('utf-8'))
+
                 if config.getboolean("Pickup", "PM each player on start"):
                     for player in players:
                         msg  = config.get("Pickup messages", "youre needed nocaptains").decode('string-escape')%\
@@ -465,7 +468,7 @@ class Game:
                                     }
                                     for player in players]),
                             }
-                        self.pickup.pypickupbot.msg(player, msg.encode("utf-8"))
+                        self.pickup.pypickupbot.msg(player, msg.encode('utf-8'))
 
         else:  # if not self.autopick
             # Create a pickpool containing Player instances
@@ -535,8 +538,7 @@ class Game:
             captainlist = [c.nick.encode('utf-8') for c in captains]
             self.pickup.pypickupbot.fire('pickup_game_starting', self, playerlist, captainlist)
 
-            self.pickup.pypickupbot.cmsg(
-                config.get('Pickup messages', 'game ready autopick').decode('string-escape')%
+            cmsg = config.get('Pickup messages', 'game ready autopick').decode('string-escape')%\
                 {
                     'nick': self.nick,
                     'playernum': len(players),
@@ -567,7 +569,9 @@ class Game:
                                 }
                                 for player in captains]),
                     'elo_diff': captain_elo_diff,
-                })
+                }
+            self.pickup.pypickupbot.cmsg(cmsg.encode('utf-8'))
+                
             if config.getboolean("Pickup", "PM each player on start"):
                 for player in players:
                     msg = config.get("Pickup messages", "youre needed").decode('string-escape')%\
@@ -593,7 +597,7 @@ class Game:
                                 }
                                 for player in captains]),
                         }
-                    self.pickup.pypickupbot.msg(player, msg.encode("utf-8"))
+                    self.pickup.pypickupbot.msg(player, msg.encode('utf-8'))
 
         self.pickup.pypickupbot.fire('pickup_game_started', self, playerlist, captainlist)
         self.starting = False
@@ -907,15 +911,16 @@ class XonstatPickupBot:
                 raise InputError(_("Join the game yourself before promoting it."))
 
             self.last_promote = time()
-            self.pypickupbot.cmsg(
-                config.get('Pickup messages', 'promote').decode('string-escape') % {
+            cmsg = config.get('Pickup messages', 'promote').decode('string-escape')%\
+                {
                     'bold': '\x02', 'prefix': config.get('Bot', 'command prefix'),
                     'name': game.name, 'nick': game.nick,
                     'command': config.get('Bot', 'command prefix')+'add '+game.nick,
                     'channel': self.pypickupbot.channel,
                     'playersneeded': game.maxplayers-len(game.players),
                     'maxplayers': game.maxplayers, 'numplayers': len(game.players),
-                })
+                }
+            self.pypickupbot.cmsg(cmsg.encode('utf-8'))
         return admin.addCallbacks(_knowAdmin)
 
     def pull(self, call, args):
@@ -1199,7 +1204,7 @@ class XonstatPickupBot:
         """
         if not len(args) == 1:
             raise InputError(_("You need to specify one player name."))
-        nick = args[0].lower()
+        nick = args[0]
         d = call.confirm(_("This will delete all entries registered to {0}, continue?").format(nick))
         def _confirmed(ret):
             if ret:
