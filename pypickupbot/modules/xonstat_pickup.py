@@ -168,6 +168,9 @@ class Player:
         except:
             nick = self.nick
         return self._irc_colors(nick, bold=True)
+    
+    def get_stripped_nick(self):
+        return self._get_player_info()['player']['stripped_nick']
 
     def get_elo_dict(self):
         return self._get_player_info()['elos']
@@ -403,8 +406,7 @@ class Game:
                     })
                 if config.getboolean("Pickup", "PM each player on start"):
                     for player in players:
-                        self.pickup.pypickupbot.msg(player, 
-                            config.get("Pickup messages", "youre needed").decode('string-escape')%
+                        msg = config.get("Pickup messages", "youre needed").decode('string-escape')%\
                             {
                                 'channel': self.pickup.pypickupbot.channel,
                                 'name': self.name,
@@ -426,7 +428,8 @@ class Game:
                                         'playerid': player.playerid,
                                     }
                                     for player in captains]),
-                            })
+                            }
+                        self.pickup.pypickupbot.msg(player, msg.encode("utf-8"))
             else:
                 self.pickup.pypickupbot.cmsg(
                     config.get('Pickup messages', 'game ready nocaptains').decode('string-escape')%
@@ -447,8 +450,7 @@ class Game:
                     })
                 if config.getboolean("Pickup", "PM each player on start"):
                     for player in players:
-                        self.pickup.pypickupbot.msg(player, 
-                            config.get("Pickup messages", "youre needed nocaptains").decode('string-escape')%
+                        msg  = config.get("Pickup messages", "youre needed nocaptains").decode('string-escape')%\
                             {
                                 'channel': self.pickup.pypickupbot.channel,
                                 'name': self.name,
@@ -462,7 +464,8 @@ class Game:
                                         'playerid': player.playerid,
                                     }
                                     for player in players]),
-                            })
+                            }
+                        self.pickup.pypickupbot.msg(player, msg.encode("utf-8"))
 
         else:  # if not self.autopick
             # Create a pickpool containing Player instances
@@ -567,8 +570,7 @@ class Game:
                 })
             if config.getboolean("Pickup", "PM each player on start"):
                 for player in players:
-                    self.pickup.pypickupbot.msg(player, 
-                        config.get("Pickup messages", "youre needed").decode('string-escape')%
+                    msg = config.get("Pickup messages", "youre needed").decode('string-escape')%\
                         {
                             'channel': self.pickup.pypickupbot.channel,
                             'name': self.name,
@@ -590,7 +592,8 @@ class Game:
                                     'playerid': player.playerid,
                                 }
                                 for player in captains]),
-                        })
+                        }
+                    self.pickup.pypickupbot.msg(player, msg.encode("utf-8"))
 
         self.pickup.pypickupbot.fire('pickup_game_started', self, playerlist, captainlist)
         self.starting = False
@@ -721,7 +724,7 @@ class XonstatInterface:
     def _search(self, string):
         result = {}
         for k,p in self.players.items():
-            if string.lower() in p.get_nick().lower():
+            if string.lower() in p.get_stripped_nick().lower():
                 result[k] = p
         return result
 
@@ -1004,11 +1007,11 @@ class XonstatPickupBot:
             if is_op:
                 reply = config.get("Xonstat Interface", "player whois").decode('string-escape')%\
                         { 'players': ", ".join(["{0} ({1})".format(k, players[k].index) for k in keys]),
-                          'num_players': len(players), 'gamenick': players.values()[0].get_nick(), }
+                          'num_players': len(players), 'gamenick': players.values()[0].get_stripped_nick(), }
             else:        
                 reply = config.get("Xonstat Interface", "player whois").decode('string-escape')%\
                         { 'players': ", ".join(["{0}".format(k) for k in keys]),
-                          'num_players': len(players), 'gamenick': players.values()[0].get_nick(), }
+                          'num_players': len(players), 'gamenick': players.values()[0].get_stripped_nick(), }
             call.reply(reply)
         FetchedList.has_flag(self.pypickupbot, self.pypickupbot.channel, call.nick, 'o').addCallback(do_call)        
 
@@ -1061,7 +1064,7 @@ class XonstatPickupBot:
         if not len(args) == 1:
             raise InputError("You need to specify a player nickname.")
         
-        nick = self.xonstat._get_original_nick(args[0])
+        nick = self.xonstat._get_original_nick(args[0].lower())
         player = self.xonstat._find_player(nick)
         if not player:
             call.reply(_("No player named <{0}> found!").format(nick))
@@ -1120,7 +1123,7 @@ class XonstatPickupBot:
         if not len(args) == 1:
             raise InputError(_("You must name a player to look up."))
 
-        nick = self.xonstat._get_original_nick(args[0])
+        nick = self.xonstat._get_original_nick(args[0].lower())
         player = self.xonstat._find_player(nick)
         if player:
             reply = _("This nick is registered with player id #%(playerid)s (as \x02%(originalnick)s\x02). " + \
@@ -1144,7 +1147,7 @@ class XonstatPickupBot:
         if not len(args) == 1:
             raise InputError(_("You must specify your Xonstat profile id to register an account."))
         
-        nick = self.xonstat._get_original_nick(call.nick)
+        nick = self.xonstat._get_original_nick(call.nick).lower()
         player = self.xonstat._find_player(nick)
         if player:
             raise InputError(_("This nick is already registered with player id #{0} (as <{1}>) - can't continue! " + \
@@ -1160,7 +1163,7 @@ class XonstatPickupBot:
             # SAFETY FEATURE DROPPED 
             #raise InputError(_("This player id is already registered to {0} (as <{1}>) - can't continue! " + \
             #        "If you need to change your nick, please contact one of the channel operators.").\
-            #        format(player.get_nick(), player.nick))
+            #        format(player.get_stripped_nick(), player.nick))
             self.pypickupbot.msg(self.pypickupbot.channel,
                     _("This player id is already registered! Plese check if your input is correct before you continue. Use !whois {0} to look up who registered to this player id").\
                     format(playerid))
@@ -1169,9 +1172,9 @@ class XonstatPickupBot:
         if not player.is_valid():
             raise InputError(_("This doesn't seem to be a valid Xonstat playerid!"))
 
-        d = call.confirm(_("You're about to register yourself with player id #{0} (\x02{1}\x02, " + \
+        d = call.confirm(_("You're about to register yourself with player id #{0} ({1}, " + \
                 "Xonstat profile {2}), is this correct?").\
-                format(player.get_id(), player.get_nick(), player.get_xonstat_url()))
+                format(player.get_id(), player.get_stripped_nick(), player.get_xonstat_url()))
         def _confirmed(ret):
             if ret:
                 def done(*args):
@@ -1180,7 +1183,7 @@ class XonstatPickupBot:
                         call.reply("Done.")
                         msg = config.get('Xonstat Interface', 'player registered').decode('string-escape')%\
                             { 'nick': nick, 'playerid': playerid, 'gamenick': player.get_nick(), 'profile': player.get_xonstat_url(), }
-                        self.pypickupbot.msg( self.pypickupbot.channel, msg )
+                        self.pypickupbot.msg( self.pypickupbot.channel, msg.encode("utf-8") )
                     self.xonstat._load_from_db().addCallback(done)
                 self.xonstat._insert(nick, playerid).addCallback(done)
             else:
@@ -1196,7 +1199,7 @@ class XonstatPickupBot:
         """
         if not len(args) == 1:
             raise InputError(_("You need to specify one player name."))
-        nick = args[0]
+        nick = args[0].lower()
         d = call.confirm(_("This will delete all entries registered to {0}, continue?").format(nick))
         def _confirmed(ret):
             if ret:
