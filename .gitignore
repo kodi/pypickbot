@@ -7,5 +7,7 @@
 /config
 /init.cfg
 /db.sqlite
+/*.iml
+/.idea
 /pypickupbot/modules/dropin.cache
 _build
