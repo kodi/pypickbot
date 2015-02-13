@@ -369,7 +369,7 @@ class PickupBot:
 
     def maps(self, call, args):
 
-        call.reply(self.maps)
+        self.pypickupbot.cmsg(self.maps)
 
     def set_maps(self, call, args):
 
