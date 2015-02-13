@@ -1,5 +1,5 @@
 # pypickupbot - An ircbot that helps game players to play organized games
-#               with captain-picked teams.
+# with captain-picked teams.
 #     Copyright (C) 2010 pypickupbot authors
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -31,8 +31,10 @@ from pypickupbot.irc import COMMAND, InputError
 from pypickupbot.topic import Topic
 from pypickupbot import config
 
+
 class Game:
     """A game that can be played in the channel"""
+
     def __init__(self, pickup, nick, name, captains=2, players=8, autopick=False, **kwargs):
         self.pickup = pickup
         self.nick = nick
@@ -44,9 +46,9 @@ class Game:
         self.players = []
         self.starting = False
         self.abort_start = False
-        
+
         if 'teamnames' in kwargs:
-            self.teamnames = config.getlist('Pickup: '+nick, 'teamnames')
+            self.teamnames = config.getlist('Pickup: ' + nick, 'teamnames')
         else:
             self.teamnames = []
 
@@ -58,10 +60,11 @@ class Game:
         def _knowStart(start):
             if not start:
                 self.pickup.pypickupbot.cmsg(
-                    _("%s game about to start..")%self.name
+                    _("%s game about to start..") % self.name
                 )
             else:
                 self.do_start()
+
         start.addCallback(_knowStart)
 
     def abort_start(self):
@@ -93,63 +96,63 @@ class Game:
 
         self.pickup.update_topic()
 
-        self.pickup.pypickupbot.notice(self.pickup.pypickupbot.channel, 
-            _("%(gamenick)s game ready to start in %(channel)s")
-                % {'gamenick': self.nick, 'channel': self.pickup.pypickupbot.channel})
+        self.pickup.pypickupbot.notice(self.pickup.pypickupbot.channel,
+                                       _("%(gamenick)s game ready to start in %(channel)s")
+                                       % {'gamenick': self.nick, 'channel': self.pickup.pypickupbot.channel})
 
         captains = []
 
         if not self.autopick:
             pickpool = sorted(players)
-            captains = random.sample(pickpool,2)
+            captains = random.sample(pickpool, 2)
 
             self.pickup.pypickupbot.fire('pickup_game_starting', self, players, captains)
-            if len( captains ) > 0:
-                self.pickup.pypickupbot.msg( self.pickup.pypickupbot.channel,
-                    config.get('Pickup messages', 'game ready').decode('string-escape')%
-                    {
-                        'nick': self.nick,
-                        'playernum': len(self.players),
-                        'playermax': self.maxplayers,
-                        'name': self.name,
-                        'numcaps': self.caps,
-                        'playerlist': ', '.join(players),
-                        'captainlist': ', '.join(captains)
-                    })
+            if len(captains) > 0:
+                self.pickup.pypickupbot.msg(self.pickup.pypickupbot.channel,
+                                            config.get('Pickup messages', 'game ready').decode('string-escape') %
+                                            {
+                                                'nick': self.nick,
+                                                'playernum': len(self.players),
+                                                'playermax': self.maxplayers,
+                                                'name': self.name,
+                                                'numcaps': self.caps,
+                                                'playerlist': ', '.join(players),
+                                                'captainlist': ', '.join(captains)
+                                            })
                 if config.getboolean("Pickup", "PM each player on start"):
                     for player in players:
-                        self.pickup.pypickupbot.msg(player, 
-                            config.get("Pickup messages", "youre needed").decode('string-escape')%
-                            {
-                                'channel': self.pickup.pypickupbot.channel,
-                                'name': self.name,
-                                'nick': self.nick,
-                                'numcaps': self.caps,
-                                'playerlist': ', '.join(players),
-                                'captainlist': ', '.join(captains)
-                            })
+                        self.pickup.pypickupbot.msg(player,
+                                                    config.get("Pickup messages", "youre needed").decode('string-escape') %
+                                                    {
+                                                        'channel': self.pickup.pypickupbot.channel,
+                                                        'name': self.name,
+                                                        'nick': self.nick,
+                                                        'numcaps': self.caps,
+                                                        'playerlist': ', '.join(players),
+                                                        'captainlist': ', '.join(captains)
+                                                    })
             else:
-                self.pickup.pypickupbot.msg( self.pickup.pypickupbot.channel,
-                    config.get('Pickup messages', 'game ready nocaptains').decode('string-escape')%
-                    {
-                        'nick': self.nick,
-                        'playernum': len(self.players),
-                        'playermax': self.maxplayers,
-                        'name': self.name,
-                        'numcaps': self.caps,
-                        'playerlist': ', '.join(players)
-                    })
+                self.pickup.pypickupbot.msg(self.pickup.pypickupbot.channel,
+                                            config.get('Pickup messages', 'game ready nocaptains').decode('string-escape') %
+                                            {
+                                                'nick': self.nick,
+                                                'playernum': len(self.players),
+                                                'playermax': self.maxplayers,
+                                                'name': self.name,
+                                                'numcaps': self.caps,
+                                                'playerlist': ', '.join(players)
+                                            })
                 if config.getboolean("Pickup", "PM each player on start"):
                     for player in players:
-                        self.pickup.pypickupbot.msg(player, 
-                            config.get("Pickup messages", "youre needed nocaptains").decode('string-escape')%
-                            {
-                                'channel': self.pickup.pypickupbot.channel,
-                                'name': self.name,
-                                'nick': self.nick,
-                                'numcaps': self.caps,
-                                'playerlist': ', '.join(players),
-                            })
+                        self.pickup.pypickupbot.msg(player,
+                                                    config.get("Pickup messages", "youre needed nocaptains").decode('string-escape') %
+                                                    {
+                                                        'channel': self.pickup.pypickupbot.channel,
+                                                        'name': self.name,
+                                                        'nick': self.nick,
+                                                        'numcaps': self.caps,
+                                                        'playerlist': ', '.join(players),
+                                                    })
         else:
             teams = [[] for i in range(self.caps)]
             players_ = sorted(players)
@@ -160,7 +163,7 @@ class Game:
 
             self.pickup.pypickupbot.fire('pickup_game_starting', self, teams, captains)
             self.pickup.pypickupbot.cmsg(
-                config.get('Pickup messages', 'game ready autopick').decode('string-escape')%
+                config.get('Pickup messages', 'game ready autopick').decode('string-escape') %
                 {
                     'nick': self.nick,
                     'playernum': len(players),
@@ -168,7 +171,7 @@ class Game:
                     'name': self.name,
                     'numcaps': self.caps,
                     'teamslist': ', '.join([
-                        config.get('Pickup messages', 'game ready autopick team').decode('string-escape')%
+                        config.get('Pickup messages', 'game ready autopick team').decode('string-escape') %
                         {
                             'name': self.teamname(i),
                             'players': ', '.join(team)
@@ -184,14 +187,14 @@ class Game:
         if len(self.teamnames) > i:
             return self.teamnames[i]
         else:
-            return _("Team {0}").format(i+1)
+            return _("Team {0}").format(i + 1)
 
     def add(self, call, user):
         """Add a player to this game"""
         if user not in self.players:
             self.players.append(user)
             self.pickup.update_topic()
-        
+
         if len(self.players) >= self.maxplayers:
             self.pre_start()
             return False
@@ -199,7 +202,9 @@ class Game:
     def who(self):
         """Who is in this game"""
         if len(self.players):
-            return config.get('Pickup messages', 'who game').decode('string-escape') % {'nick': self.nick, 'playernum': len(self.players), 'playermax': self.maxplayers, 'name': self.name, 'numcaps': self.caps, 'playerlist': ', '.join(self.players) }
+            return config.get('Pickup messages', 'who game').decode('string-escape') % {'nick': self.nick, 'playernum': len(self.players),
+                                                                                        'playermax': self.maxplayers, 'name': self.name,
+                                                                                        'numcaps': self.caps, 'playerlist': ', '.join(self.players)}
 
     def remove(self, call, user):
         """Removes a player from this game"""
@@ -225,17 +230,22 @@ class Game:
         except ValueError:
             pass
 
+
 class Games(Game):
     """Groups multiple games to dispatch calls"""
+
     def __init__(self, games):
         self.games = games
 
     def remove(self, *args):
         for game in self.games: game.remove(*args)
+
     def pre_start(self, *args):
         for game in self.games: game.pre_start(*args)
+
     def force_remove(self, *args):
         for game in self.games: game.force_remove(*args)
+
     def rename(self, *args):
         for game in self.games: game.rename(*args)
 
@@ -315,17 +325,17 @@ class PickupBot:
                     })
 
         self.topic.update(
-            config.get('Pickup messages', 'topic game separator')\
-                .decode('string-escape')\
+            config.get('Pickup messages', 'topic game separator') \
+            .decode('string-escape') \
             .join(out)
-            )
+        )
 
     def add(self, call, args):
         """!add [game [game ..]]
 
         Signs you up for one or more games"""
         self.get_games(call, args,
-            config.getboolean("Pickup", "implicit all games in add"))\
+                       config.getboolean("Pickup", "implicit all games in add")) \
             .add(call, call.nick)
 
     def remove(self, call, args):
@@ -344,19 +354,19 @@ class PickupBot:
             all = True
         if len(games):
             if all:
-                call.reply(_("All games:")+" "+config.get('Pickup messages', 'who game separator').decode('string-escape').join(games),
+                call.reply(_("All games:") + " " + config.get('Pickup messages', 'who game separator').decode('string-escape').join(games),
 
 
-                    config.get('Pickup messages', 'who game separator').decode('string-escape'))
+                           config.get('Pickup messages', 'who game separator').decode('string-escape'))
             else:
                 call.reply(config.get('Pickup messages', 'who game separator').decode('string-escape').join(games),
-                    config.get('Pickup messages', 'who game separator').decode('string-escape'))
+                           config.get('Pickup messages', 'who game separator').decode('string-escape'))
         else:
             if all:
                 call.reply(_("No game going on!"))
             else:
-                call.reply(_n("No game in mode %s", "No game in modes %s", len(args)) % ' '.join(args) )
-        
+                call.reply(_n("No game in mode %s", "No game in modes %s", len(args)) % ' '.join(args))
+
     def promote(self, call, args):
         """!promote <game>
 
@@ -379,11 +389,12 @@ class PickupBot:
                 config.get('Pickup messages', 'promote').decode('string-escape') % {
                     'bold': '\x02', 'prefix': config.get('Bot', 'command prefix'),
                     'name': game.name, 'nick': game.nick,
-                    'command': config.get('Bot', 'command prefix')+'add '+game.nick,
+                    'command': config.get('Bot', 'command prefix') + 'add ' + game.nick,
                     'channel': self.pypickupbot.channel,
-                    'playersneeded': game.maxplayers-len(game.players),
+                    'playersneeded': game.maxplayers - len(game.players),
                     'maxplayers': game.maxplayers, 'numplayers': len(game.players),
                 })
+
         return admin.addCallbacks(_knowAdmin)
 
     def pull(self, call, args):
@@ -414,11 +425,11 @@ class PickupBot:
 
         Lists games available for pickups.
         """
-        call.reply( ', '.join(
-                ["%s (%s)" % (nick, game.name)
-                for nick, game in self.games.iteritems()
-                if not args or args[0] in nick or args[0] in game.name.lower()]
-            ), ', ')
+        call.reply(', '.join(
+            ["%s (%s)" % (nick, game.name)
+             for nick, game in self.games.iteritems()
+             if not args or args[0] in nick or args[0] in game.name.lower()]
+        ), ', ')
 
 
     def __init__(self, bot):
@@ -432,14 +443,14 @@ class PickupBot:
             log.err('Could not find section "Pickup games" of the config!')
             return
         games = config.items('Pickup games')
-#        log.msg(games)
+        #        log.msg(games)
 
         for (gamenick, gamename) in games:
             if gamenick == 'order':
                 self.order = config.getlist('Pickup games', 'order')
             else:
-                if config.has_section('Pickup: '+gamenick):
-                    gamesettings = dict(config.items('Pickup: '+gamenick))
+                if config.has_section('Pickup: ' + gamenick):
+                    gamesettings = dict(config.items('Pickup: ' + gamenick))
                 else:
                     gamesettings = {}
                 self.games[gamenick] = Game(
@@ -465,24 +476,27 @@ class PickupBot:
         """track quitters"""
         if channel == self.pypickupbot.channel:
             self.all_games().force_remove(user.split('!')[0])
-    
+
     def userQuit(self, user, quitMessage):
         """track quitters"""
         self.all_games().force_remove(user.split('!')[0])
 
     commands = {
         'add': (add, COMMAND.NOT_FROM_PM),
-            'addup': (add, COMMAND.NOT_FROM_PM),        
+        'a': (add, COMMAND.NOT_FROM_PM),
+        'addup': (add, COMMAND.NOT_FROM_PM),
         'remove': (remove, COMMAND.NOT_FROM_PM),
-            'leave': (remove, COMMAND.NOT_FROM_PM),
-            'logout': (remove, COMMAND.NOT_FROM_PM),
+        'r': (remove, COMMAND.NOT_FROM_PM),
+        'leave': (remove, COMMAND.NOT_FROM_PM),
+        'logout': (remove, COMMAND.NOT_FROM_PM),
         'who': (who, 0),
+        'w': (who, 0),
         'promote': (promote, COMMAND.NOT_FROM_PM),
         'pull': (pull, COMMAND.NOT_FROM_PM | COMMAND.ADMIN),
         'start': (force_start, COMMAND.NOT_FROM_PM | COMMAND.ADMIN),
         'abort': (abort, COMMAND.NOT_FROM_PM | COMMAND.ADMIN),
         'pickups': (pickups, 0),
-        }
+    }
 
     eventhandlers = {
         'joinedHomeChannel': joinedHomeChannel,
@@ -491,6 +505,7 @@ class PickupBot:
         'userKicked': userLeft,
         'userQuit': userQuit,
     }
+
 
 pickup = SimpleModuleFactory(PickupBot)
 
