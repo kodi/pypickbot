@@ -373,8 +373,8 @@ class PickupBot:
 
     def set_maps(self, call, args):
 
-        self.maps = args
-        call.reply('Maps set to : ' + args)
+        self.maps = ' '.join(args)
+        call.reply('Maps set to : ' + ' '.join(args))
 
 
 
