@@ -367,6 +367,17 @@ class PickupBot:
             else:
                 call.reply(_n("No game in mode %s", "No game in modes %s", len(args)) % ' '.join(args))
 
+    def maps(self, call, args):
+
+        call.reply(self.maps)
+
+    def set_maps(self, call, args):
+
+        self.maps = args
+        call.reply('Maps set to : ' + args)
+
+
+
     def promote(self, call, args):
         """!promote <game>
 
@@ -439,6 +450,7 @@ class PickupBot:
         self.games = {}
         self.order = []
         self.last_promote = 0
+        self.maps = ''
         if not config.has_section('Pickup games'):
             log.err('Could not find section "Pickup games" of the config!')
             return
@@ -496,6 +508,8 @@ class PickupBot:
         'start': (force_start, COMMAND.NOT_FROM_PM | COMMAND.ADMIN),
         'abort': (abort, COMMAND.NOT_FROM_PM | COMMAND.ADMIN),
         'pickups': (pickups, 0),
+        'maps': (maps, 0),
+        'set_maps': (set_maps, 0),
     }
 
     eventhandlers = {
