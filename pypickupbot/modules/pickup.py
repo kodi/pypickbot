@@ -509,7 +509,7 @@ class PickupBot:
         'abort': (abort, COMMAND.NOT_FROM_PM | COMMAND.ADMIN),
         'pickups': (pickups, 0),
         'maps': (maps, 0),
-        'set_maps': (set_maps, 0),
+        'set_maps': (set_maps, COMMAND.NOT_FROM_PM | COMMAND.ADMIN),
     }
 
     eventhandlers = {
